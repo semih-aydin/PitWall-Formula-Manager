@@ -1,13 +1,17 @@
+// PitWall: Formula Manager — Sollama ve Tekerlek Tekerleğe Kapışma Motoru
+// İki araç viraj girişinde veya düzlükte kapıştığında kim öne çıkacak?
+
 import { CarState, Driver, RaceEvent } from '../types';
 
 export interface OvertakeAttemptResult {
-  success: boolean;
-  event?: Omit<RaceEvent, 'id'>;
+  success: boolean;               // Geçiş başarılı oldu mu?
+  event?: Omit<RaceEvent, 'id'>;  // Telsiz/spiker mesajı
 }
 
 export class OvertakeEngine {
   /**
-   * Resolves an overtake attempt between a chasing car and defending car.
+   * Arkadaki araç (chaser) ile öndeki aracı (defender) kapıştırır.
+   * Hız farkı, 2026 MOM batarya avantajı, öndekinin savunma gücü ve pilot yeteneklerini tartar.
    */
   public static evaluateOvertake(params: {
     chaser: CarState;
@@ -28,51 +32,55 @@ export class OvertakeEngine {
       chaserPosition,
     } = params;
 
-    // Both cars must be active and close
+    // Biri yarış dışıysa (DNF) zaten kapışma olmaz
     if (chaser.isDnf || defender.isDnf) {
       return { success: false };
     }
 
     const chaserLap = chaser.lastLapTimeSec || 999;
     const defenderLap = defender.lastLapTimeSec || 999;
-    const deltaAdvantage = defenderLap - chaserLap; // Positive means chaser was faster
+    const deltaAdvantage = defenderLap - chaserLap; // Pozitifse arkadaki daha hızlı demektir
 
-    // If chaser was faster and was within striking distance (<= 1.2s)
+    // Arkadaki araç hem turda daha hızlıysa hem de 1.2 saniyelik atak mesafesindeyse kapışma başlar!
     if (deltaAdvantage > 0.25 && chaser.intervalToAheadSec <= 1.2) {
-      // 2026 Energy battle:
+      
+      // 2026 Batarya Savaşı:
       let chaserMOMBonus = 0;
       let defenderDefenseBonus = 0;
 
+      // Saldıran araç 350kW Manual Override açtıysa arkasına roket takılmış gibi gelir (+30 puan)
       if (chaser.momActive) {
-        chaserMOMBonus = 30; // 350kW sustained speed boost
+        chaserMOMBonus = 30;
       }
 
-      // Defender tactics: If defender has > 25% battery, use tactical energy to defend!
+      // Savunan aracın taktiği: Eğer liderin bataryasında >%25 şarj varsa o da bataryayı harcayıp kapıyı kapatır!
       if (defender.batterySoCPct > 25.0 && defender.engineMode !== 'ECO') {
         defender.defensiveDeployActive = true;
-        defender.batterySoCPct = Math.max(0, defender.batterySoCPct - 8.0);
+        defender.batterySoCPct = Math.max(0, defender.batterySoCPct - 8.0); // Savunma için biraz pil yakar
         defenderDefenseBonus = 18;
       } else {
         defender.defensiveDeployActive = false;
       }
 
-      // Racecraft and composure comparison
+      // Saldırı Puanı: Pilotun tekerlek tekerleğe zekası + hız farkı + MOM takviyesi + şans faktörü
       const attackScore =
         (chaserDriver.racecraft * 1.25) +
         (deltaAdvantage * 35) +
         chaserMOMBonus +
         (Math.random() * 12);
 
+      // Savunma Puanı: Öndekinin tecrübesi + batarya savunması + bitik lastik zafiyeti + şans faktörü
       const defenseScore =
         (defenderDriver.racecraft * 1.2) +
         defenderDefenseBonus +
-        (defender.tires.isCliffHit ? -35 : 0) + // Cliffed tires cannot defend!
+        (defender.tires.isCliffHit ? -35 : 0) + // Lastiği biten adam asla savunma yapamaz!
         (Math.random() * 12);
 
+      // Eğer hücum skoru savunmayı yenerse geçiş tamamlanır!
       if (attackScore > defenseScore) {
         const passDetail = chaser.momActive
-          ? 'using 2026 Manual Override Mode (350kW burst) into the chicane!'
-          : 'with a bold dive down the inside!';
+          ? '2026 Manual Override (350kW) roket moduyla düzlükte uçtu geçti!'
+          : 'viraj öncesi cesur bir geç frenajla içeri dalarak sırayı kaptı!';
 
         return {
           success: true,
@@ -81,7 +89,7 @@ export class OvertakeEngine {
             timestampSec: raceTimeSec,
             type: 'OVERTAKE',
             driverId: chaserDriver.id,
-            message: `🔥 P${chaserPosition - 1} OVERTAKE: ${chaserDriver.shortCode} passed ${defenderDriver.shortCode} ${passDetail}`,
+            message: `🔥 P${chaserPosition - 1} GEÇİŞİ: ${chaserDriver.shortCode}, ${defenderDriver.shortCode}'u ${passDetail}`,
             severity: 'TACTICAL',
           },
         };

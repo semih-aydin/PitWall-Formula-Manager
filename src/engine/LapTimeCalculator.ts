@@ -1,3 +1,7 @@
+// PitWall: Formula Manager — Tur Zamanı ve Sektör Hesaplama Motoru
+// Bu modül bir aracın 1 turu kaç saniyede tamamladığını ve S1, S2, S3 sürelerini hesaplar.
+// Tüm etkenler burada toplanır: Pilot yeteneği + Lastik + 2026 MOM + Kirli Hava + Şans faktörü.
+
 import {
   CarState,
   Driver,
@@ -10,16 +14,16 @@ import { AeroPowerUnitModel } from './AeroPowerUnitModel';
 import { TireModel } from './TireModel';
 
 export interface LapTimeResult {
-  lapTimeSec: number;
-  sectorTimes: [number, number, number];
-  sectorStatuses: [SectorStatus, SectorStatus, SectorStatus];
-  hasLockup: boolean;
-  newEvents: Omit<RaceEvent, 'id'>[];
+  lapTimeSec: number;                                       // Toplam tur süresi (örn: 80.245s)
+  sectorTimes: [number, number, number];                    // [S1, S2, S3] saniyeleri
+  sectorStatuses: [SectorStatus, SectorStatus, SectorStatus];// [Mor, Yeşil, Sarı] renk durumları
+  hasLockup: boolean;                                       // Bu tur virajda fren kilitlendi mi?
+  newEvents: Omit<RaceEvent, 'id'>[];                       // Üretilen telsiz ve yarış olayları
 }
 
 export class LapTimeCalculator {
   /**
-   * Calculates detailed sector times and full lap time for a car.
+   * Bir aracın tur süresini milisaniyesine kadar hesaplar.
    */
   public static calculateLapTime(params: {
     car: CarState;
@@ -46,29 +50,29 @@ export class LapTimeCalculator {
 
     const newEvents: Omit<RaceEvent, 'id'>[] = [];
 
-    // 1. Base Lap Time
+    // 1. Temel Pist Süresi (Pist boşken atılacak standart süre + pite girildiyse pit kaybı)
     let totalLapTime = track.baseLapTimeSec + pitLossSec;
 
-    // 2. Driver Skill Baseline (-0.55s for 98 skill vs 82 baseline)
+    // 2. Pilot Yeteneği Farkı (Verstappen gibi 98 skill pilotlar 82'lik çaylaklara göre ~0.55s hızlıdır)
     const driverPaceDelta = -((driver.skill - 82) / 18) * 0.55;
     totalLapTime += driverPaceDelta;
 
-    // 3. Pace Mode (Push / Balanced / Conserve)
+    // 3. Strateji Modu (PUSH gaza basar zaman kazandırır, CONSERVE lastik korur zaman kaybettirir)
     let paceWearMultiplier = 1.0;
     if (car.paceMode === 'PUSH') {
-      totalLapTime -= 0.45;
-      paceWearMultiplier = 1.45;
+      totalLapTime -= 0.45;        // -0.45s hız kazanır
+      paceWearMultiplier = 1.45;   // Ama lastiği %45 daha hızlı yakar
     } else if (car.paceMode === 'CONSERVE') {
-      totalLapTime += 0.40;
-      paceWearMultiplier = 0.75;
+      totalLapTime += 0.40;        // +0.40s yavaşlar
+      paceWearMultiplier = 0.75;   // Ama lastik ömrünü uzatır
     }
 
-    // 4. Dirty Air Penalty: If following within 0.8s without passing
+    // 4. Kirli Hava (Dirty Air) Kaybı: Öndeki aracın 0.8s arkasındaysak aerodinamik tutuş bozulur
     if (car.inDirtyAir && pitLossSec === 0) {
-      totalLapTime += 0.28; // Dirty air turbulence slows cornering grip
+      totalLapTime += 0.28; // Virajlarda arkadan kayma ve tutuş kaybı (+0.28s)
     }
 
-    // 5. Tire Delta, The Cliff & Lock-up Risk
+    // 5. Lastik Hamuru, Aşınma ve "Uçurum" (The Cliff) Etkisi
     const tireDelta = TireModel.calculateTireDeltaSec(
       car.tires,
       trackWetnessPct,
@@ -76,35 +80,35 @@ export class LapTimeCalculator {
     );
     totalLapTime += tireDelta.deltaSec;
 
-    // Check if The Cliff was just struck
+    // Uçurum ilk defa bu tur vurulduysa telsizden acil durum uyarısı patlat!
     if (tireDelta.isCliff && !car.tires.isCliffHit) {
       newEvents.push({
         lap: currentLap,
         timestampSec: raceTimeSec,
         type: 'CLIFF_HIT',
         driverId: driver.id,
-        message: `⚠️ THE CLIFF HIT! ${driver.shortCode}: "Tires completely gone, zero grip!" (+2.5s/lap loss)`,
+        message: `⚠️ UÇURUM ÇARPTI! ${driver.shortCode}: "Lastikler bitti dostum, arkada sıfır tutuş var!" (+2.5s/tur kayıp)`,
         severity: 'WARNING',
       });
     }
 
-    // Lock-up chance (higher on worn tires or high driver stress)
+    // Fren Kilitleme (Lock-up) Kontrolü (Lastik eskidikçe ve pilot zorladıkça kilitlenme ihtimali artar)
     let hasLockup = false;
     const lockupRoll = Math.random() * 100;
     if (lockupRoll < tireDelta.lockupRiskPct) {
       hasLockup = true;
-      totalLapTime += 1.35; // Running wide at Turn 1 chicane
+      totalLapTime += 1.35; // Virajı geniş alıp kaçış alanına taştığı için +1.35s kaybeder
       newEvents.push({
         lap: currentLap,
         timestampSec: raceTimeSec,
         type: 'LOCKUP',
         driverId: driver.id,
-        message: `💨 LOCK-UP! ${driver.shortCode} locked front-right into braking zone! Heavy flat spot.`,
+        message: `💨 FREN KİLİTLENDİ! ${driver.shortCode} ilk virajda dumanlar çıkararak lastiği düzleştirdi (flat spot)!`,
         severity: 'TACTICAL',
       });
     }
 
-    // Apply tire wear with dirty air thermal impact
+    // Bu tur için lastik aşınmasını ve kirli hava ısınmasını uygula
     car.tires = TireModel.degradeTire(
       car.tires,
       paceWearMultiplier,
@@ -113,7 +117,7 @@ export class LapTimeCalculator {
       car.inDirtyAir
     );
 
-    // 6. 2026 Aero and Power Unit (X-Mode & MOM Overtake)
+    // 6. 2026 Aktif Aero ve Manual Override (MOM) Batarya Hesabı
     const aeroPower = AeroPowerUnitModel.calculateLapAeroPower({
       track,
       engineMode: car.engineMode,
@@ -134,22 +138,22 @@ export class LapTimeCalculator {
         timestampSec: raceTimeSec,
         type: 'MOM_DEPLOYED',
         driverId: driver.id,
-        message: `⚡ ${driver.shortCode} engaged 2026 Manual Override Mode (350kW electric deploy)`,
+        message: `⚡ ${driver.shortCode} 2026 Manual Override (350kW) roket modunu açtı!`,
         severity: 'INFO',
       });
     }
 
-    // 7. Small natural lap variance
+    // 7. Doğal Tur Varyansı (Her tur birbirinin fotokopisi olmasın diye +/- 0.1s rastgelelik)
     const variance = (Math.random() - 0.5) * 0.22;
     totalLapTime += variance;
 
     const roundedLapTime = Math.round(totalLapTime * 1000) / 1000;
 
-    // 8. Sector Times Breakdown (S1, S2, S3)
+    // 8. Sektör Zamanlarını Parçalara Ayırma (S1, S2, S3)
     const s1Ratio = track.sectors[0].baseTimeSec / track.baseLapTimeSec;
     const s2Ratio = track.sectors[1].baseTimeSec / track.baseLapTimeSec;
 
-    // Add small sector variance
+    // Sektörler arası mikro dalgalanmalar
     const s1 = Math.round((roundedLapTime * s1Ratio + (Math.random() - 0.5) * 0.15) * 1000) / 1000;
     const s2 = Math.round((roundedLapTime * s2Ratio + (Math.random() - 0.5) * 0.15) * 1000) / 1000;
     const s3 = Math.round((roundedLapTime - s1 - s2) * 1000) / 1000;
@@ -157,7 +161,10 @@ export class LapTimeCalculator {
     const sectorTimes: [number, number, number] = [s1, s2, s3];
     const sectorStatuses: [SectorStatus, SectorStatus, SectorStatus] = ['YELLOW', 'YELLOW', 'YELLOW'];
 
-    // Determine Sector Colors (Purple = session fastest, Green = personal best, Yellow = slower)
+    // Sektör Renklerini Belirleme (F1 Canlı Zamanlama Kuralı):
+    // PURPLE (Mor): Tüm seansın en iyi sektör derecesi
+    // GREEN (Yeşil): Pilotun o yarıştaki kendi en iyi derecesi
+    // YELLOW (Sarı): Önceki turlara göre daha yavaş sektör
     sectorTimes.forEach((time, idx) => {
       const sessionBest = sessionBestSectors[idx];
       const personalBest = car.personalBestSectors[idx];

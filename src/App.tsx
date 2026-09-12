@@ -41,7 +41,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col p-4">
-      {/* Top Telemetry Header */}
+      {/* Üst Telemetri Başlığı ve Genel Yarış Bilgisi */}
       <header className="border-b border-neutral-800 pb-3 mb-4 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -50,25 +50,25 @@ export default function App() {
               PITWALL: FORMULA MANAGER
             </h1>
             <span className="text-xs bg-red-950/80 text-red-400 border border-red-800/60 px-2 py-0.5 rounded font-mono font-semibold">
-              2026 ACTIVE AERO & MOM
+              2026 AKTİF AERO & MOM
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Pist: {selectedTrack.name} ({selectedTrack.totalLaps} Tur) | Durum: {snapshot.flag}
+            Pist: {selectedTrack.name} ({selectedTrack.totalLaps} Tur) | Bayrak: {snapshot.flag}
           </p>
         </div>
 
-        {/* Global Stats */}
+        {/* Global Yarış İstatistikleri (Lider, En Hızlı Tur, Tur Sayacı) */}
         <div className="flex items-center gap-4 text-xs font-mono">
           <div className="bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded">
-            <span className="text-neutral-500 block text-[10px]">CURRENT LAP</span>
+            <span className="text-neutral-500 block text-[10px]">TUR SAYACI</span>
             <span className="text-sm font-bold text-amber-400">
               {snapshot.currentLap} / {snapshot.totalLaps}
             </span>
           </div>
 
           <div className="bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded">
-            <span className="text-neutral-500 block text-[10px]">RACE LEADER</span>
+            <span className="text-neutral-500 block text-[10px]">YARIŞ LİDERİ</span>
             <span className="text-sm font-bold text-emerald-400">
               {leaderDriver?.name || '---'} ({leaderDriver?.shortCode})
             </span>
@@ -76,7 +76,7 @@ export default function App() {
 
           {snapshot.fastestLap && (
             <div className="bg-neutral-900 border border-purple-900/60 px-3 py-1.5 rounded text-purple-300">
-              <span className="text-purple-400 block text-[10px]">FASTEST LAP 🟣</span>
+              <span className="text-purple-400 block text-[10px]">EN HIZLI TUR 🟣</span>
               <span className="text-sm font-bold">
                 {sim.getDriver(snapshot.fastestLap.driverId)?.shortCode} ({snapshot.fastestLap.lapTimeSec.toFixed(3)}s)
               </span>
@@ -88,7 +88,7 @@ export default function App() {
               onClick={handleNextLap}
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-2 rounded text-xs transition cursor-pointer"
             >
-              <Play className="w-3.5 h-3.5" /> TUR ATLA (+1 LAP)
+              <Play className="w-3.5 h-3.5" /> TUR ATLA (+1 TUR)
             </button>
             <button
               onClick={handleReset}
@@ -100,9 +100,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Command Center Grid */}
+      {/* Ana Komuta Masası Izgarası */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1">
-        {/* Left 8 Cols: Live Timing Tower */}
+        {/* Sol 8 Kolon: 22 Araçlık Canlı Sıralama Kulesi */}
         <div className="lg:col-span-8 bg-neutral-900/60 border border-neutral-800 rounded-lg p-3 flex flex-col">
           <div className="flex items-center justify-between pb-2 border-b border-neutral-800 mb-2">
             <div className="flex items-center gap-2 text-xs font-bold text-neutral-300">

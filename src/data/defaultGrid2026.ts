@@ -1,14 +1,18 @@
+// PitWall: Formula Manager — 2026 Sezonu Grid Kadrosu
+// FOM ve FIA telif davalarından korunmak için isimler tatlı parodi / saygı isimleriyle yazılmıştır.
+// Oyuncular isterse daha sonra tek tıkla kendi JSON kadrosunu yükleyebilir!
+
 import { Driver, Team } from '../types';
 
 export const DEFAULT_DRIVERS_2026: Driver[] = [
-  // Scuderia Rossa (Ferrari)
+  // 1. Scuderia Rossa (Ferrari Kırmızıları)
   {
     id: 'd_leconte',
     name: 'Charles Leconte',
     shortCode: 'LEC',
     number: 16,
     country: 'Monaco',
-    skill: 94,
+    skill: 94,             // Saf tek tur hızı canavar gibidir
     racecraft: 92,
     tireManagement: 87,
     composure: 85,
@@ -21,20 +25,20 @@ export const DEFAULT_DRIVERS_2026: Driver[] = [
     number: 44,
     country: 'United Kingdom',
     skill: 93,
-    racecraft: 96,
-    tireManagement: 95,
+    racecraft: 96,         // Tekerlek tekerleğe kapışmada tam bir tilkidir
+    tireManagement: 95,    // Lastik ömrünü uzatmada dünya birincisi
     composure: 94,
     morale: 90,
   },
 
-  // Viper Racing (Red Bull Ford)
+  // 2. Viper Racing (Red Bull Ford Canavarı)
   {
     id: 'd_voster',
     name: 'Max Van Der Berg',
     shortCode: 'VER',
     number: 1,
     country: 'Netherlands',
-    skill: 98,
+    skill: 98,             // Gridin en hızlı saf yeteneği
     racecraft: 97,
     tireManagement: 93,
     composure: 95,
@@ -293,32 +297,32 @@ export const DEFAULT_TEAMS_2026: Team[] = [
     id: 'team_ferrari',
     name: 'Scuderia Rossa',
     shortName: 'ROSSA',
-    colorHex: '#dc2626',       // Vivid Ferrari Red
+    colorHex: '#dc2626',       // Canlı Maranello Kırmızısı
     secondaryColorHex: '#ffffff',
-    enginePower: 94,
+    enginePower: 94,           // Güçlü içten yanmalı motor
     aeroEfficiency: 93,
     chassisBalance: 92,
-    pitCrewRating: 88,
+    pitCrewRating: 88,          // İyi ama arada taktik hatası yapabilirler
     driverIds: ['d_leconte', 'd_hampton'],
   },
   {
     id: 'team_redbull',
     name: 'Viper Racing',
     shortName: 'VIPER',
-    colorHex: '#1e3a8a',       // Deep Navy
-    secondaryColorHex: '#facc15', // Yellow accent
+    colorHex: '#1e3a8a',       // Koyu Gece Mavisi
+    secondaryColorHex: '#facc15', // Mat Sarı detaylar
     enginePower: 96,
-    aeroEfficiency: 96,
+    aeroEfficiency: 96,        // Aerodinamik dehası
     chassisBalance: 95,
-    pitCrewRating: 98,          // Legendary 1.9s pit crew
+    pitCrewRating: 98,          // Efsanevi 1.9 saniyelik robotik pit ekibi
     driverIds: ['d_voster', 'd_lawson'],
   },
   {
     id: 'team_mclaren',
     name: 'Papaya GP',
     shortName: 'PAPAYA',
-    colorHex: '#f97316',       // Papaya Orange
-    secondaryColorHex: '#06b6d4', // Cyan
+    colorHex: '#f97316',       // Meşhur Papaya Turuncusu
+    secondaryColorHex: '#06b6d4', // Camgöbeği
     enginePower: 95,
     aeroEfficiency: 95,
     chassisBalance: 94,

@@ -1,20 +1,24 @@
+// PitWall: Formula Manager — Pist Verileri
+// İkonik pistlerin telifsiz coğrafi isimleri, sektör süreleri ve 2026 Aktif Aero (X-Mode) düzlük bölgeleri.
+
 import { Track } from '../types';
 
 export const DEFAULT_TRACKS: Track[] = [
+  // 1. Monza (İtalya): Hız Tapınağı — Uzun düzlükler, sert şikanlar ve yüksek hız
   {
     id: 'track_monza',
-    name: 'Royal Temple of Speed (Lombardia)',
+    name: 'Royal Temple of Speed (Lombardia / Monza)',
     country: 'Italy',
     totalLaps: 53,
     lengthMeters: 5793,
-    baseLapTimeSec: 81.5,      // ~1:21.500
-    pitLaneLossSec: 24.2,      // Pit lane speed limit loss
+    baseLapTimeSec: 81.5,      // Ortalama tur: ~1:21.500
+    pitLaneLossSec: 24.2,      // Pit yolu hız limiti ve geçiş kaybı: ~24.2 saniye
     activeAeroZones: [
       {
         id: 'zone_main_straight',
-        name: 'Rettifilo Main Straight',
+        name: 'Rettifilo Ana Düzlüğü',
         startPct: 0.88,
-        endPct: 0.12,          // Across Start/Finish
+        endPct: 0.12,          // Start/Finish çizgisini kapsar
         isStraight: true,
       },
       {
