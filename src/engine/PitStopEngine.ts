@@ -59,7 +59,7 @@ export class PitStopEngine {
         timestampSec: raceTimeSec,
         type: 'DOUBLE_STACK',
         driverId: driver.id,
-        message: `⚠️ DOUBLE-STACK GECİKMESİ: ${driver.shortCode} takım arkadaşının arkasında pit kutusunda bekledi! (+${queueDelay.toFixed(1)}s kayıp)`,
+        message: `[DOUBLE-STACK] ${driver.shortCode} takım arkadaşının arkasında pit kutusunda bekledi! (+${queueDelay.toFixed(1)}s kayıp)`,
         severity: 'WARNING',
       });
     } else {
@@ -79,7 +79,7 @@ export class PitStopEngine {
         timestampSec: raceTimeSec,
         type: 'PIT_ERROR',
         driverId: driver.id,
-        message: `🚨 BİJON SIKIŞTI! ${team.shortName} mekanikerleri sağ arka bijonla cebelleşiyor! (${driver.shortCode} için duraklama: ${serviceTime.toFixed(1)}s)`,
+        message: `[BİJON HATASI] ${team.shortName} mekanikerleri sağ arka bijonla cebelleşiyor! (${driver.shortCode} duraklama: ${serviceTime.toFixed(1)}s)`,
         severity: 'DANGER',
       });
     } else {
@@ -88,7 +88,7 @@ export class PitStopEngine {
         timestampSec: raceTimeSec,
         type: 'PIT_EXIT',
         driverId: driver.id,
-        message: `🟢 ${driver.shortCode} pitten temiz çıktı (${serviceTime.toFixed(1)}s) -> Taze ${car.selectedNextCompound} takıldı.`,
+        message: `[PİT ÇIKIŞI] ${driver.shortCode} pitten temiz çıktı (${serviceTime.toFixed(1)}s) -> Taze ${car.selectedNextCompound} takıldı.`,
         severity: 'INFO',
       });
     }

@@ -12,6 +12,7 @@ import {
   TireCompound,
   Track,
 } from '../types';
+import { AeroPowerUnitModel } from './AeroPowerUnitModel';
 import { LapTimeCalculator } from './LapTimeCalculator';
 import { OvertakeEngine } from './OvertakeEngine';
 import { PitStopEngine } from './PitStopEngine';
@@ -225,7 +226,7 @@ export class RaceSimulation {
           timestampSec: this.raceTimeSec,
           type: 'FASTEST_LAP',
           driverId: driver.id,
-          message: `🟣 EN HIZLI TUR: ${driver.shortCode} — ${this.formatTime(lapCalcResult.lapTimeSec)}`,
+          message: `[EN HIZLI TUR] ${driver.shortCode} — ${this.formatTime(lapCalcResult.lapTimeSec)}`,
           severity: 'TACTICAL',
         });
       }
@@ -320,7 +321,7 @@ export class RaceSimulation {
       timestampSec: this.raceTimeSec,
       type: 'RADIO_MESSAGE',
       driverId,
-      message: `📻 PIT DUVARI -> ${driver.shortCode}: "BOX, BOX! Bu turun sonunda pite gel, ${nextCompound} takıyoruz."`,
+      message: `[TELSİZ] PIT DUVARI -> ${driver.shortCode}: "BOX, BOX! Bu turun sonunda pite gel, ${nextCompound} takıyoruz."`,
       severity: 'TACTICAL',
     });
 
@@ -383,5 +384,117 @@ export class RaceSimulation {
     const m = Math.floor(sec / 60);
     const s = (sec % 60).toFixed(3).padStart(6, '0');
     return `${m}:${s}`;
+  }
+
+  /**
+   * The Rejoin Ghost (Hayalet Çıkış Göstergesi) Hesabı:
+   * "Seçilen pilot ŞU SANİYE pite girerse, pistte tam olarak kimin önünde/arkasında çıkar?"
+   * Pit kaybı süresi kadar geriye sanal bir hayalet izdüşüm hesaplar.
+   */
+  public calculateRejoinProjection(driverId: string): {
+    rejoinProgressPct: number;
+    projectedPosition: number;
+    aheadDriverCode?: string;
+    behindDriverCode?: string;
+    gapToAheadSec: number;
+  } {
+    const car = this.cars.find((c) => c.driverId === driverId);
+    if (!car) {
+      return { rejoinProgressPct: 0, projectedPosition: 1, gapToAheadSec: 0 };
+    }
+
+    const team = this.teamsMap.get(car.teamId);
+    const serviceTime = 2.4 + (team ? Math.max(0, 100 - team.pitCrewRating) * 0.014 : 0);
+    const totalPitLossSec = this.track.pitLaneLossSec + serviceTime;
+
+    const baseLapTime = car.lastLapTimeSec || this.track.baseLapTimeSec;
+    const speedMps = this.track.lengthMeters / baseLapTime;
+    const distanceLossMeters = speedMps * totalPitLossSec;
+
+    // Pit kaybı sonrası tahmini toplam kat edilmiş mesafe
+    const projectedDistance = Math.max(0, car.totalDistanceMeters - distanceLossMeters);
+    const rejoinProgressPct = (projectedDistance % this.track.lengthMeters) / this.track.lengthMeters;
+
+    // Pistteki diğer 21 aracın konumlarına göre tahmini dönüş pozisyonunu belirle
+    let projectedPosition = 1;
+    let aheadCar: CarState | undefined;
+    let behindCar: CarState | undefined;
+
+    for (const otherCar of this.cars) {
+      if (otherCar.driverId === driverId) continue;
+      if (otherCar.totalDistanceMeters > projectedDistance) {
+        projectedPosition++;
+        if (!aheadCar || otherCar.totalDistanceMeters < aheadCar.totalDistanceMeters) {
+          aheadCar = otherCar;
+        }
+      } else {
+        if (!behindCar || otherCar.totalDistanceMeters > behindCar.totalDistanceMeters) {
+          behindCar = otherCar;
+        }
+      }
+    }
+
+    const aheadDriver = aheadCar ? this.driversMap.get(aheadCar.driverId) : undefined;
+    const behindDriver = behindCar ? this.driversMap.get(behindCar.driverId) : undefined;
+    const gapToAheadSec = aheadCar
+      ? Math.round(((aheadCar.totalDistanceMeters - projectedDistance) / speedMps) * 10) / 10
+      : 0;
+
+    return {
+      rejoinProgressPct,
+      projectedPosition,
+      aheadDriverCode: aheadDriver?.shortCode,
+      behindDriverCode: behindDriver?.shortCode,
+      gapToAheadSec,
+    };
+  }
+
+  /**
+   * Gerçek Zamanlı Mikro-Adım (Tick) Simülasyonu:
+   * 60 FPS animasyonda arabaların pist üstünde akıcı kaymasını sağlar.
+   */
+  public simulateTick(dtSec: number): SimulationSnapshot {
+    if (this.currentLap >= this.track.totalLaps) {
+      return this.getSnapshot();
+    }
+
+    this.raceTimeSec += dtSec;
+
+    for (let i = 0; i < this.cars.length; i++) {
+      const car = this.cars[i];
+      if (car.isDnf) continue;
+
+      const estimatedLapTime = car.lastLapTimeSec || this.track.baseLapTimeSec;
+      const speedMps = this.track.lengthMeters / estimatedLapTime;
+      
+      // Mesafeyi dtSec kadar ilerlet
+      car.totalDistanceMeters += speedMps * dtSec;
+      car.currentSpeedKmh = Math.round((speedMps * 3.6) * 10) / 10;
+
+      const newLapProgress = (car.totalDistanceMeters % this.track.lengthMeters) / this.track.lengthMeters;
+      car.lapProgressPct = newLapProgress;
+
+      // 2026 Aktif Aerodinamik Kontrolü: Düzlükte X-Mode, virajda Z-Mode
+      car.aeroMode = AeroPowerUnitModel.evaluateAeroMode(this.track, newLapProgress);
+      if (car.aeroMode === 'X_MODE') {
+        car.currentSpeedKmh += car.momActive ? 30 : 15; // X-Mode hız takviyesi
+      }
+
+      // Tur bitti mi?
+      const completedLaps = Math.floor(car.totalDistanceMeters / this.track.lengthMeters);
+      if (completedLaps > car.currentLap) {
+        car.currentLap = completedLaps;
+      }
+    }
+
+    // Lider araca göre tur ve farkları güncelle
+    const leaderLaps = Math.floor((this.cars[0]?.totalDistanceMeters || 0) / this.track.lengthMeters);
+    if (leaderLaps > this.currentLap) {
+      this.currentLap = Math.min(this.track.totalLaps, leaderLaps);
+      this.resolveOvertakes();
+      this.updateGapsAndIntervals();
+    }
+
+    return this.getSnapshot();
   }
 }

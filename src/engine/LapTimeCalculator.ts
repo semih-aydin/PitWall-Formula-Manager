@@ -87,7 +87,7 @@ export class LapTimeCalculator {
         timestampSec: raceTimeSec,
         type: 'CLIFF_HIT',
         driverId: driver.id,
-        message: `⚠️ UÇURUM ÇARPTI! ${driver.shortCode}: "Lastikler bitti dostum, arkada sıfır tutuş var!" (+2.5s/tur kayıp)`,
+        message: `[UÇURUM] ${driver.shortCode}: "Lastikler bitti dostum, arkada sıfır tutuş var!" (+2.5s/tur kayıp)`,
         severity: 'WARNING',
       });
     }
@@ -103,7 +103,7 @@ export class LapTimeCalculator {
         timestampSec: raceTimeSec,
         type: 'LOCKUP',
         driverId: driver.id,
-        message: `💨 FREN KİLİTLENDİ! ${driver.shortCode} ilk virajda dumanlar çıkararak lastiği düzleştirdi (flat spot)!`,
+        message: `[KİLİTLENME] ${driver.shortCode} ilk virajda lastiği kilitledi (flat spot)!`,
         severity: 'TACTICAL',
       });
     }
@@ -138,7 +138,7 @@ export class LapTimeCalculator {
         timestampSec: raceTimeSec,
         type: 'MOM_DEPLOYED',
         driverId: driver.id,
-        message: `⚡ ${driver.shortCode} 2026 Manual Override (350kW) roket modunu açtı!`,
+        message: `[MOM AKTİF] ${driver.shortCode} 2026 Manual Override (350kW) tam güç modunu açtı!`,
         severity: 'INFO',
       });
     }

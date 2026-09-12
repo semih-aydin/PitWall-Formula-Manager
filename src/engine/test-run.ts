@@ -10,12 +10,12 @@ import { RaceSimulation } from './RaceSimulation';
 function printLeaderboard(sim: RaceSimulation, lap: number) {
   const snapshot = sim.getSnapshot();
   console.log(`\n==========================================================================================`);
-  console.log(`🏁 PITWALL: FORMULA MANAGER — CANLI ZAMANLAMA KULESİ (TUR ${lap}/${snapshot.totalLaps})`);
+  console.log(`PITWALL: FORMULA MANAGER — CANLI ZAMANLAMA KULESİ (TUR ${lap}/${snapshot.totalLaps})`);
   console.log(`   Pist: Monza (Royal Temple) | Durum: ${snapshot.flag} | Islaklık: %${snapshot.trackWetnessPct}`);
   
   if (snapshot.fastestLap) {
     const d = sim.getDriver(snapshot.fastestLap.driverId);
-    console.log(`   🟣 EN HIZLI TUR: ${d?.shortCode} — ${(snapshot.fastestLap.lapTimeSec).toFixed(3)}s (Tur ${snapshot.fastestLap.lapNumber})`);
+    console.log(`   [EN HIZLI TUR] ${d?.shortCode} — ${(snapshot.fastestLap.lapTimeSec).toFixed(3)}s (Tur ${snapshot.fastestLap.lapNumber})`);
   }
 
   const sBest = snapshot.sessionBestSectors;
@@ -33,22 +33,22 @@ function printLeaderboard(sim: RaceSimulation, lap: number) {
     const name = driver.shortCode.padEnd(4, ' ');
     const teamName = team.shortName.padEnd(9, ' ');
 
-    // Lastik hamuru ve tur sayısı
-    const tireColor = car.tires.compound === 'SOFT' ? '🔴 S' : car.tires.compound === 'MEDIUM' ? '🟡 M' : '⚪ H';
+    // Lastik hamuru ve tur sayısı (temiz metin etiketleri)
+    const tireColor = car.tires.compound === 'SOFT' ? '[S]' : car.tires.compound === 'MEDIUM' ? '[M]' : '[H]';
     const tireInfo = `${tireColor} ${car.tires.ageLaps}L`.padEnd(9, ' ');
     
-    // Sağlık ve sıcaklık (kirli havadaysa yanına duman ikonu koyuyoruz)
-    const health = `${car.tires.healthPct.toFixed(0)}%`.padStart(4, ' ') + (car.tires.isCliffHit ? '⚠️' : '  ');
-    const temp = `${car.tires.tempCelsius.toFixed(0)}°C`.padStart(6, ' ') + (car.inDirtyAir ? '💨' : '  ');
-    const battery = `${car.batterySoCPct.toFixed(0)}%`.padStart(5, ' ') + (car.momActive ? '🚀' : '  ');
+    // Sağlık ve sıcaklık (kirli havadaysa D işareti, cliff ise ! işareti)
+    const health = `${car.tires.healthPct.toFixed(0)}%`.padStart(4, ' ') + (car.tires.isCliffHit ? '(!)' : '   ');
+    const temp = `${car.tires.tempCelsius.toFixed(0)}°C`.padStart(6, ' ') + (car.inDirtyAir ? '(D)' : '   ');
+    const battery = `${car.batterySoCPct.toFixed(0)}%`.padStart(5, ' ') + (car.momActive ? '(M)' : '   ');
 
     const gap = index === 0 ? 'LİDER   ' : `+${car.gapToLeaderSec.toFixed(1)}s`.padStart(8, ' ');
 
-    // Sektör renkleri: Mor (🟣 rekor), Yeşil (🟢 kişisel en iyi), Sarı (🟡 yavaş)
-    const s1Icon = car.sectorStatuses[0] === 'PURPLE' ? '🟣' : car.sectorStatuses[0] === 'GREEN' ? '🟢' : '🟡';
-    const s2Icon = car.sectorStatuses[1] === 'PURPLE' ? '🟣' : car.sectorStatuses[1] === 'GREEN' ? '🟢' : '🟡';
-    const s3Icon = car.sectorStatuses[2] === 'PURPLE' ? '🟣' : car.sectorStatuses[2] === 'GREEN' ? '🟢' : '🟡';
-    const sectors = `${s1Icon}${car.sectorTimes[0].toFixed(1)} ${s2Icon}${car.sectorTimes[1].toFixed(1)} ${s3Icon}${car.sectorTimes[2].toFixed(1)}`;
+    // Sektör renk etiketleri: [P] Mor (rekor), [G] Yeşil (kişisel en iyi), [Y] Sarı (yavaş)
+    const s1Tag = car.sectorStatuses[0] === 'PURPLE' ? '[P]' : car.sectorStatuses[0] === 'GREEN' ? '[G]' : '[Y]';
+    const s2Tag = car.sectorStatuses[1] === 'PURPLE' ? '[P]' : car.sectorStatuses[1] === 'GREEN' ? '[G]' : '[Y]';
+    const s3Tag = car.sectorStatuses[2] === 'PURPLE' ? '[P]' : car.sectorStatuses[2] === 'GREEN' ? '[G]' : '[Y]';
+    const sectors = `${s1Tag}${car.sectorTimes[0].toFixed(1)} ${s2Tag}${car.sectorTimes[1].toFixed(1)} ${s3Tag}${car.sectorTimes[2].toFixed(1)}`;
 
     console.log(`${pos}  #${num}  ${name}  ${teamName}  ${tireInfo}  ${health}  ${temp}  ${battery}  ${gap}  ${sectors}`);
   });
@@ -57,7 +57,7 @@ function printLeaderboard(sim: RaceSimulation, lap: number) {
 
 // Ana simülasyon testi
 async function runTestSimulation() {
-  console.log("🏎️ [Faz 1] PitWall Modüler Simülasyon Testi Başlatılıyor...");
+  console.log("[Faz 1] PitWall Modüler Simülasyon Testi Başlatılıyor...");
 
   const track = DEFAULT_TRACKS[0]; // Monza Pisti
   const sim = new RaceSimulation({
@@ -72,13 +72,13 @@ async function runTestSimulation() {
   for (let lap = 1; lap <= totalTestLaps; lap++) {
     // 3. Tur: Pit duvarından Leconte'a "Bas gaza" (PUSH) emri veriyoruz
     if (lap === 3) {
-      console.log(`\n📻 [Tur 3 Strateji Emri] C. Leconte (LEC) tempoyu artırıyor: PUSH modu!`);
+      console.log(`\n[Tur 3 Strateji Emri] C. Leconte (LEC) tempoyu artırıyor: PUSH modu!`);
       sim.setPaceMode('d_leconte', 'PUSH');
     }
 
     // 7. Tur: Leconte için 2026 MOM roket modu aktif ediliyor
     if (lap === 7) {
-      console.log(`\n📻 [Tur 7 Strateji Emri] C. Leconte (LEC) için 2026 MOM Overtake devrede!`);
+      console.log(`\n[Tur 7 Strateji Emri] C. Leconte (LEC) için 2026 MOM Overtake devrede!`);
       sim.setEngineMode('d_leconte', 'OVERTAKE');
     }
 
@@ -86,7 +86,7 @@ async function runTestSimulation() {
     // Ferrari stratejisti iki pilotunu (LEC ve HAM) aynı tur peş peşe pite çağırıyor!
     // Arkadaki pilotun pit kutusunda bekleyip beklemediğini test ediyoruz.
     if (lap === 10) {
-      console.log(`\n🚨 [Tur 10 DOUBLE-STACK TESTİ] Scuderia Rossa ikisini birden çağırdı: LEC ve HAM aynı tur pite!`);
+      console.log(`\n[Tur 10 DOUBLE-STACK TESTİ] Scuderia Rossa ikisini birden çağırdı: LEC ve HAM aynı tur pite!`);
       sim.orderBox('d_leconte', 'HARD');
       sim.orderBox('d_hampton', 'HARD');
     }
@@ -108,12 +108,12 @@ async function runTestSimulation() {
 
   // Sonuç özeti ve son olaylar
   const finalSnapshot = sim.getSnapshot();
-  console.log(`\n📋 YARIŞ ÖZETİ VE KRİTİK OLAYLAR (Son 15 Olay):`);
+  console.log(`\n--- YARIŞ ÖZETİ VE KRİTİK OLAYLAR (Son 15 Olay) ---`);
   finalSnapshot.recentEvents.slice(0, 15).reverse().forEach((evt) => {
     console.log(`   [Tur ${evt.lap.toString().padStart(2, ' ')}] ${evt.message}`);
   });
 
-  console.log(`\n✅ [Faz 1] Simülasyon Testi Başarıyla Tamamlandı!`);
+  console.log(`\n[BAŞARILI] [Faz 1] Simülasyon Testi Başarıyla Tamamlandı!`);
 }
 
 runTestSimulation().catch(console.error);

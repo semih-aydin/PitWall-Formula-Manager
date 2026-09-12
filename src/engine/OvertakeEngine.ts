@@ -89,7 +89,7 @@ export class OvertakeEngine {
             timestampSec: raceTimeSec,
             type: 'OVERTAKE',
             driverId: chaserDriver.id,
-            message: `🔥 P${chaserPosition - 1} GEÇİŞİ: ${chaserDriver.shortCode}, ${defenderDriver.shortCode}'u ${passDetail}`,
+            message: `[GEÇİŞ] P${chaserPosition - 1}: ${chaserDriver.shortCode}, ${defenderDriver.shortCode}'u ${passDetail}`,
             severity: 'TACTICAL',
           },
         };
