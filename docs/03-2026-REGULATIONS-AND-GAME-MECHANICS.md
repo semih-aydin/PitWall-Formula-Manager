@@ -37,9 +37,9 @@ Bu doküman, 2026 FIA regülasyonlarının getirdiği devrimsel kuralları (Akti
 #### Stratejistin Ekranındaki MOM Hissiyatı:
 - Ekranın altındaki pilot telemetrisinde **Batarya Şarj Barı (SoC: State of Charge: %0 - %100)** yer alır.
 - Stratejist pilota 3 farklı ERS emri verebilir:
-  1. `🔋 Harvest / Charge` (Bataryayı doldur, atağa hazırlan).
-  2. `⚡ Balanced` (Standart tur tüketimi).
-  3. `🚀 Overtake / MOM Deploy` (Bataryayı düzlükte tamamen boşalt, geçişi tamamla veya arkadakini kopar!).
+  1. ` Harvest / Charge` (Bataryayı doldur, atağa hazırlan).
+  2. ` Balanced` (Standart tur tüketimi).
+  3. ` Overtake / MOM Deploy` (Bataryayı düzlükte tamamen boşalt, geçişi tamamla veya arkadakini kopar!).
 - Yanlış zamanda bataryayı bitirirsen (derate), düzlük sonunda rakibine kolay yem olursun!
 
 ---
@@ -53,14 +53,14 @@ Ekran 3 ana taktiksel bölmeye ayrılmıştır:
 │ SOL: CANLI SIRALAMA     │ ORTA: 2D PİST RADARI          │ SAĞ: HAVA & TELEMETRİ   │
 │ (Live Timing Tower)     │ (Circuit Vector & Rejoin)     │ (Doppler & Car Status)  │
 │                         │                               │                         │
-│ P1  [#1 VER]  Soft (3L) │          ╭──────────╮         │ 🌧️ Yağmur: Turn 4 (4T) │
+│ P1  [#1 VER]  Soft (3L) │          ╭──────────╮         │ ️ Yağmur: Turn 4 (4T) │
 │     Gap: Leader         │         ╱            ╲        │ Track Wet: 12% (Kuru)   │
 │ P2  [#16 LEC] Med (14L) │        │   2D PİST    │        │                         │
-│     Gap: +1.4s Int:+1.4 │        │   RADARI     │        │ 🛞 Lastik: FL FR RL RR  │
-│ P3  [#4 NOR]  Hard (2L) │         ╲   👻 REJOIN ╱       │     88% 84% 76% 72%     │
+│     Gap: +1.4s Int:+1.4 │        │   RADARI     │        │  Lastik: FL FR RL RR  │
+│ P3  [#4 NOR]  Hard (2L) │         ╲    REJOIN ╱       │     88% 84% 76% 72%     │
 │     Gap: +3.2s Int:+1.8 │          ╰──────────╯         │                         │
-│                         │                               │ ⚡ Battery (SoC): 68%   │
-│ 🟢 S1: 28.1 🟣 S2: 32.4 │ 🔴 Araçlar (Neon Kapsüller)   │ 🌡️ Motor Isısı: 98°C    │
+│                         │                               │  Battery (SoC): 68%   │
+│  S1: 28.1  S2: 32.4 │  Araçlar (Neon Kapsüller)   │ ️ Motor Isısı: 98°C    │
 └─────────────────────────┴───────────────────────────────┴─────────────────────────┘
 │ ALT PANEL: STRATEJİST EMİRLERİ (Pilot 1 & Pilot 2)                                │
 │ [BOX THIS LAP]  [PUSH / CONSERVE]  [MOM OVERTAKE DEPLOY]  [TIRE PLAN: A -> B]     │

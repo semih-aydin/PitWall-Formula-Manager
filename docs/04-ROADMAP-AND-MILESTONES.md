@@ -4,14 +4,14 @@ Bu doküman, kullanıcının *"daha sakin, daha yavaş gidelim, her şeyi anınd
 
 ---
 
-## 🧭 Temel Yaklaşım: "Önce Temel Çalışsın, Sonra Katman Ekleyelim"
+##  Temel Yaklaşım: "Önce Temel Çalışsın, Sonra Katman Ekleyelim"
 
 Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, veritabanını ve yapay zekayı aynı anda yazmaya çalışıp tıkanmaktır.  
 **Bizim stratejimiz:** Önce matematik ve simülasyon kuralları tıkır tıkır çalışacak, ardından 2D pist ve arayüz giydirilecek, en son ses ve dilemma motoruyla heyecan cilası atılacaktır.
 
 ---
 
-## 🏁 Faz 0: Altyapı, Git ve Netlify Kurulumu (Tamamlanma: Hemen)
+##  Faz 0: Altyapı, Git ve Netlify Kurulumu (Tamamlanma: Hemen)
 
 **Hedef:** Projenin temiz bir GitHub reposuna bağlanması, Netlify CI/CD otomasyonu ve dokümanların yerleşmesi.
 
@@ -22,7 +22,7 @@ Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, verit
 
 ---
 
-## 🏎️ Faz 1: Çekirdek Simülasyon Motoru (Headless Engine) (1-2 Hafta)
+## ️ Faz 1: Çekirdek Simülasyon Motoru (Headless Engine) (1-2 Hafta)
 
 **Hedef:** Henüz hiçbir grafik arayüzü olmadan, arka planda (Web Worker veya saf TypeScript içinde) 22 aracın yarışabildiği saf matematik motorunun yazılması.
 
@@ -40,7 +40,7 @@ Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, verit
 
 ---
 
-## 📊 Faz 2: Canlı Telemetri & 2D Pist Radarı (2 Hafta)
+##  Faz 2: Canlı Telemetri & 2D Pist Radarı (2 Hafta)
 
 **Hedef:** Saf matematik motorunu şık, neon ve karanlık modda çalışan NASA telemetri masasıyla birleştirmek.
 
@@ -48,7 +48,7 @@ Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, verit
 1. **Canlı Sıralama Kulesi (Live Timing Tower):**
    - 22 pilotun anlık P1-P22 sıralaması.
    - Liderle fark (Gap: +2.4s) ve öndekiyle aralık (Interval: +0.6s).
-   - Lastik hamur simgeleri (🔴 Soft, 🟡 Medium, ⚪ Hard) ve lastik turları.
+   - Lastik hamur simgeleri ( Soft,  Medium,  Hard) ve lastik turları.
 2. **2D Vektör Pist Çizimi (HTML5 Canvas):**
    - Örnek 1 ikonik pist (Örn: *Monte Carlo Bay* veya *Royal Temple Monza*).
    - Vektör çizgi üzerinde koordinat bazında kayan 22 renkli araç noktası.
@@ -60,7 +60,7 @@ Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, verit
 
 ---
 
-## 📻 Faz 3: Stratejist Kontrolleri & Telsiz Hissiyatı (1-2 Hafta)
+##  Faz 3: Stratejist Kontrolleri & Telsiz Hissiyatı (1-2 Hafta)
 
 **Hedef:** Oyuncunun yarışın gidişatına müdahale edebilmesini sağlamak ve telsiz sesleriyle adrenalin pompalamak.
 
@@ -77,14 +77,14 @@ Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, verit
 
 ---
 
-## ⚡ Faz 4: Kaos, Yağmur Radarı ve Dilemma Motoru (2 Hafta)
+##  Faz 4: Kaos, Yağmur Radarı ve Dilemma Motoru (2 Hafta)
 
 **Hedef:** Yarışın tekdüze geçmesini engelleyen beklenmedik olayların eklenmesi.
 
 ### Yapılacaklar:
 1. **Dinamik Hava & Doppler Radarı:**
    - Piste yaklaşan yağmur bulutu animasyonu.
-   - Pist ıslaklık yüzdesi ve Slick ➡️ Inter ➡️ Wet crossover geçişleri.
+   - Pist ıslaklık yüzdesi ve Slick ️ Inter ️ Wet crossover geçişleri.
 2. **Kaos Olayları:**
    - Spin atma, fren kilitleme (lock-up) duman animasyonu.
    - Safety Car (SC) ve Virtual Safety Car (VSC) sarı bayrak rejimleri.
@@ -95,7 +95,7 @@ Oyun geliştirmede en sık yapılan hata tüm arayüzü, 3D/2D grafikleri, verit
 
 ---
 
-## 🏆 Faz 5: Sezon İlerlemesi, Topluluk Roster'ı ve Netlify Yayını (2 Hafta)
+##  Faz 5: Sezon İlerlemesi, Topluluk Roster'ı ve Netlify Yayını (2 Hafta)
 
 **Hedef:** Tekil yarıştan tam bir sezona geçiş ve oyunu tüm dünyaya açma.
 
