@@ -1,15 +1,38 @@
 // PitWall: Formula Manager — Telsiz ve Yarış Olayları Akışı (EventFeed)
-// Emojisiz, profesyonel telemetri log tasarımı.
+// Emojisiz, profesyonel telemetri log tasarımı ve prosedürel ses tetikleme.
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { RaceEvent } from '../types';
-import { Radio, Zap, AlertTriangle, ShieldAlert, ArrowRightLeft, Flag } from 'lucide-react';
+import { Radio, Zap, AlertTriangle, ShieldAlert, ArrowRightLeft, Flag, Volume2 } from 'lucide-react';
+import { RadioAudioEngine } from '../audio/RadioAudioEngine';
 
 interface EventFeedProps {
   events: RaceEvent[];
 }
 
 export const EventFeed: React.FC<EventFeedProps> = ({ events }) => {
+  const lastEventIdRef = useRef<string | null>(null);
+
+  // Yeni olay geldiğinde otomatik telsiz cızırtısı veya alarm çalıyoruz
+  useEffect(() => {
+    if (!events || events.length === 0) return;
+    const latest = events[0];
+    if (!latest || latest.id === lastEventIdRef.current) return;
+
+    // Sayfa ilk açıldığında toplu ses patlaması olmaması için ilk olayı sessizce referansa alıyoruz
+    if (lastEventIdRef.current !== null) {
+      if (latest.type === 'RADIO_MESSAGE') {
+        RadioAudioEngine.playRadioTransmission();
+      } else if (latest.severity === 'DANGER' || latest.type === 'FLAG_CHANGE') {
+        RadioAudioEngine.playWarningAlarm();
+      } else if (latest.type === 'OVERTAKE' || latest.type === 'FASTEST_LAP') {
+        RadioAudioEngine.playRadioBeep('BEEP_MID');
+      }
+    }
+
+    lastEventIdRef.current = latest.id;
+  }, [events]);
+
   const getEventIcon = (type: RaceEvent['type']) => {
     switch (type) {
       case 'OVERTAKE':
@@ -34,9 +57,14 @@ export const EventFeed: React.FC<EventFeedProps> = ({ events }) => {
   return (
     <div className="bg-neutral-900/60 border border-neutral-800 rounded-lg p-3 flex flex-col h-full">
       {/* Başlık */}
-      <div className="flex items-center gap-2 text-xs font-bold text-neutral-300 font-mono pb-2 border-b border-neutral-800 mb-2">
-        <Radio className="w-4 h-4 text-cyan-400" />
-        TELSİZ VE YARIŞ AKIŞI (RACE EVENTS)
+      <div className="flex items-center justify-between text-xs font-bold text-neutral-300 font-mono pb-2 border-b border-neutral-800 mb-2 select-none">
+        <div className="flex items-center gap-2">
+          <Radio className="w-4 h-4 text-cyan-400" />
+          <span>TELSİZ VE YARIŞ AKIŞI (RACE EVENTS)</span>
+        </div>
+        <span className="text-[10px] text-neutral-500 font-normal">
+          {events.length} KAYIT
+        </span>
       </div>
 
       {/* Akış Listesi */}
@@ -66,7 +94,18 @@ export const EventFeed: React.FC<EventFeedProps> = ({ events }) => {
                     {getEventIcon(evt.type)}
                     <span>{evt.type}</span>
                   </div>
-                  <span>TUR {evt.lap}</span>
+                  <div className="flex items-center gap-2">
+                    {evt.type === 'RADIO_MESSAGE' && (
+                      <button
+                        onClick={() => RadioAudioEngine.playRadioTransmission()}
+                        className="text-neutral-500 hover:text-cyan-400 transition cursor-pointer"
+                        title="Telsiz Sesini Çal"
+                      >
+                        <Volume2 className="w-3 h-3" />
+                      </button>
+                    )}
+                    <span>TUR {evt.lap}</span>
+                  </div>
                 </div>
                 <p className="leading-snug text-[11px] font-mono">{evt.message}</p>
               </div>
@@ -77,3 +116,4 @@ export const EventFeed: React.FC<EventFeedProps> = ({ events }) => {
     </div>
   );
 };
+

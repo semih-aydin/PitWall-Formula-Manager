@@ -11,6 +11,7 @@ import { LiveTimingTower } from './components/LiveTimingTower';
 import { DriverTelemetryCard } from './components/DriverTelemetryCard';
 import { EventFeed } from './components/EventFeed';
 import { SpeedControls } from './components/SpeedControls';
+import { AudioControls } from './components/AudioControls';
 import { SimulationSnapshot, TireCompound, PaceMode, EngineMode } from './types';
 import { Activity, Flag } from 'lucide-react';
 
@@ -123,6 +124,13 @@ export default function App() {
   const leaderCar = snapshot.leaderboard[0];
   const leaderDriver = sim.getDriver(leaderCar?.driverId || '');
 
+  // Undercut / Overcut hesaplaması için öndeki ve arkadaki araçlar
+  const selectedIndex = snapshot.leaderboard.findIndex((c) => c.driverId === selectedDriverId);
+  const aheadCar = selectedIndex > 0 ? snapshot.leaderboard[selectedIndex - 1] : undefined;
+  const aheadDriver = aheadCar ? sim.getDriver(aheadCar.driverId) : undefined;
+  const behindCar = selectedIndex < snapshot.leaderboard.length - 1 ? snapshot.leaderboard[selectedIndex + 1] : undefined;
+  const behindDriver = behindCar ? sim.getDriver(behindCar.driverId) : undefined;
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col p-3 gap-3 font-mono">
       {/* Üst Komuta Paneli ve Global Telemetri Başlığı */}
@@ -206,15 +214,18 @@ export default function App() {
           </div>
         </div>
 
-        {/* Sağ: Hız ve Kontrol Barı */}
-        <SpeedControls
-          isPlaying={isPlaying}
-          speedMultiplier={speedMultiplier}
-          onTogglePlay={() => setIsPlaying(!isPlaying)}
-          onSetSpeed={(s) => setSpeedMultiplier(s)}
-          onNextLap={handleNextLap}
-          onReset={handleReset}
-        />
+        {/* Sağ: Ses ve Hız Kontrol Barı */}
+        <div className="flex items-center gap-2">
+          <AudioControls />
+          <SpeedControls
+            isPlaying={isPlaying}
+            speedMultiplier={speedMultiplier}
+            onTogglePlay={() => setIsPlaying(!isPlaying)}
+            onSetSpeed={(s) => setSpeedMultiplier(s)}
+            onNextLap={handleNextLap}
+            onReset={handleReset}
+          />
+        </div>
       </header>
 
       {/* Ana Kokpit Izgarası (Grid Layout) */}
@@ -234,7 +245,7 @@ export default function App() {
         {/* Sağ Panel: 2D Pist Radarı + Telemetri Masası (6 Kolon) */}
         <div className="lg:col-span-6 flex flex-col gap-3">
           {/* Üst: 2B Vektör Pist Radarı ve Hayalet Çıkış (Rejoin Ghost) */}
-          <div className="h-[360px] w-full">
+          <div className="h-[420px] w-full">
             <CircuitRadar
               trackId={selectedTrack.id}
               trackName={selectedTrack.name}
@@ -256,6 +267,11 @@ export default function App() {
                 driver={selectedDriver}
                 team={selectedTeam}
                 position={selectedPosition}
+                aheadCar={aheadCar}
+                aheadDriver={aheadDriver}
+                behindCar={behindCar}
+                behindDriver={behindDriver}
+                rejoinProjection={rejoinProjection}
                 onPaceChange={handlePaceChange}
                 onEngineChange={handleEngineChange}
                 onOrderBox={(compound) => handleOrderBox(selectedDriverId, compound)}

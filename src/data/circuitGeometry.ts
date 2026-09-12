@@ -17,129 +17,187 @@ export interface CircuitGeometry {
   sector2EndPct: number;    // Sektör 2 bitiş yüzdesi (örn: 0.67)
 }
 
+/**
+ * Kontrol noktaları dizisinden Catmull-Rom spline eğrisi üreterek
+ * pistin köşeli poligon değil, kaymak gibi akıcı ve organik virajlara sahip olmasını sağlar.
+ * Öğrenci işi mantık: 4 komşu noktanın teğetlerini alıp aralarına yumuşak geçiş noktaları serpiştiririz.
+ */
+export function smoothClosedSpline(controlPoints: Point2D[], subdivisionsPerSegment = 6): Point2D[] {
+  if (controlPoints.length < 3) return controlPoints;
+  const n = controlPoints.length;
+  const smoothed: Point2D[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const p0 = controlPoints[(i - 1 + n) % n];
+    const p1 = controlPoints[i];
+    const p2 = controlPoints[(i + 1) % n];
+    const p3 = controlPoints[(i + 2) % n];
+
+    for (let t = 0; t < subdivisionsPerSegment; t++) {
+      const u = t / subdivisionsPerSegment;
+      const u2 = u * u;
+      const u3 = u2 * u;
+
+      // Standart Catmull-Rom matrisi formülü
+      const x = 0.5 * (
+        (2 * p1.x) +
+        (-p0.x + p2.x) * u +
+        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * u2 +
+        (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * u3
+      );
+      const y = 0.5 * (
+        (2 * p1.y) +
+        (-p0.y + p2.y) * u +
+        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * u2 +
+        (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * u3
+      );
+      smoothed.push({
+        x: Math.round(x * 10) / 10,
+        y: Math.round(y * 10) / 10,
+      });
+    }
+  }
+
+  // Döngüyü eksiksiz kapatmak için ilk noktayı en sona kopyalıyoruz
+  if (smoothed.length > 0) {
+    smoothed.push({ x: smoothed[0].x, y: smoothed[0].y });
+  }
+
+  return smoothed;
+}
+
 // 1. Monza (Royal Temple of Speed) 2B Koordinat Eğrisi
-// Monza'nın meşhur yapısı: Uzun ana düzlük, Rettifilo şikanı, Curva Grande, Roggia, Lesmo virajları, Serraglio ve Parabolica.
+const MONZA_RAW_POINTS: Point2D[] = [
+  { x: 180, y: 510 }, // Start / Finish Başlangıcı
+  { x: 380, y: 510 }, // Ana Düzlük
+  { x: 580, y: 510 }, // Rettifilo frenajı
+  { x: 640, y: 480 }, // Prima Variante (Turn 1)
+  { x: 660, y: 440 }, // Prima Variante (Turn 2)
+  { x: 640, y: 390 }, // Şikan çıkışı
+  { x: 670, y: 330 }, // Curva Grande girişi
+  { x: 760, y: 240 }, // Curva Grande içi
+  { x: 860, y: 170 }, // Curva Grande çıkışı
+  { x: 910, y: 130 }, // Roggia öncesi
+  { x: 930, y: 100 }, // Roggia şikanı (Turn 4)
+  { x: 890, y: 70 },  // Roggia çıkışı (Turn 5)
+  { x: 800, y: 70 },  // Lesmo 1 girişi
+  { x: 740, y: 90 },  // Lesmo 1 apex (Turn 6)
+  { x: 690, y: 130 }, // Lesmo 2 girişi
+  { x: 640, y: 170 }, // Lesmo 2 apex (Turn 7)
+  { x: 560, y: 230 }, // Serraglio inişi (Köprü altı)
+  { x: 460, y: 280 }, // Serraglio düzlüğü
+  { x: 380, y: 320 }, // Variante Ascari frenajı
+  { x: 320, y: 300 }, // Ascari sol (Turn 8)
+  { x: 270, y: 320 }, // Ascari sağ (Turn 9)
+  { x: 220, y: 350 }, // Ascari çıkışı (Turn 10)
+  { x: 150, y: 380 }, // Rettifilo Opposto (Arka düzlük)
+  { x: 90,  y: 420 }, // Parabolica frenajı
+  { x: 70,  y: 470 }, // Parabolica apex (Turn 11)
+  { x: 110, y: 510 }, // Parabolica çıkışı
+];
+
 export const MONZA_GEOMETRY: CircuitGeometry = {
   trackId: 'track_monza',
-  viewBox: { width: 1000, height: 500 },
-  points: [
-    { x: 150, y: 420 }, // 0.00 Start/Finish Başlangıcı
-    { x: 450, y: 420 }, // 0.10 Rettifilo Düzlüğü
-    { x: 520, y: 420 }, // Rettifilo frenajı
-    { x: 535, y: 395 }, // Şikan içi
-    { x: 520, y: 370 }, // Şikan çıkışı
-    { x: 550, y: 330 }, // Curva Grande'ye giriş
-    { x: 620, y: 260 }, // Curva Grande içi
-    { x: 720, y: 190 }, // Curva Grande çıkışı
-    { x: 780, y: 150 }, // Variante della Roggia öncesi
-    { x: 795, y: 140 }, // Roggia şikanı
-    { x: 820, y: 145 }, // Roggia çıkışı
-    { x: 870, y: 160 }, // Lesmo 1 girişi
-    { x: 890, y: 185 }, // Lesmo 1 apex
-    { x: 875, y: 220 }, // Lesmo 2 öncesi
-    { x: 890, y: 245 }, // Lesmo 2 apex
-    { x: 870, y: 275 }, // Lesmo 2 çıkışı (Serraglio düzlüğüne iniş)
-    { x: 750, y: 310 }, // Serraglio düzlüğü
-    { x: 630, y: 345 }, // Köprü altı
-    { x: 520, y: 360 }, // Variante Ascari frenajı
-    { x: 470, y: 345 }, // Ascari sol
-    { x: 440, y: 325 }, // Ascari sağ
-    { x: 380, y: 300 }, // Ascari çıkışı
-    { x: 260, y: 280 }, // Arka düzlük (Rettifilo opposto)
-    { x: 180, y: 270 }, // Curva Parabolica frenajı
-    { x: 120, y: 290 }, // Parabolica girişi
-    { x: 80,  y: 340 }, // Parabolica apex (geniş sağ viraj)
-    { x: 100, y: 395 }, // Parabolica çıkışı
-    { x: 150, y: 420 }, // 1.00 Start/Finish'e bağlanış
-  ],
+  viewBox: { width: 1000, height: 600 },
+  points: smoothClosedSpline(MONZA_RAW_POINTS, 6),
   pitLanePoints: [
-    { x: 110, y: 440 }, // Pit girişi
-    { x: 300, y: 440 }, // Pit kutuları
-    { x: 490, y: 440 }, // Pit çıkışı
+    { x: 100, y: 545 }, // Pit girişi
+    { x: 380, y: 545 }, // Pit garajları
+    { x: 610, y: 540 }, // Pit çıkışı
   ],
-  startFinishPoint: { x: 250, y: 420 },
+  startFinishPoint: { x: 280, y: 510 },
   sector1EndPct: 0.33,
   sector2EndPct: 0.67,
 };
 
 // 2. Monako (Monte Carlo Bay) 2B Koordinat Eğrisi
-// Sainte Devote, Beau Rivage tırmanışı, Massenet, Casino, Mirabeau, Grand Hotel Saçtoka virajı, Tünel ve Havuz bölümü.
+const MONACO_RAW_POINTS: Point2D[] = [
+  { x: 120, y: 440 }, // Start / Finish
+  { x: 300, y: 440 }, // Sainte Devote frenajı
+  { x: 350, y: 400 }, // Sainte Devote (Turn 1)
+  { x: 380, y: 310 }, // Beau Rivage yokuşu
+  { x: 410, y: 210 }, // Massenet girişi (Turn 2)
+  { x: 460, y: 120 }, // Massenet apex (Turn 3)
+  { x: 550, y: 60 },  // Casino Meydanı (Turn 4)
+  { x: 650, y: 60 },  // Casino düzlüğü
+  { x: 720, y: 100 }, // Mirabeau Haute (Turn 5)
+  { x: 800, y: 150 }, // Grand Hotel Saçtoka öncesi
+  { x: 870, y: 200 }, // Fairmont Hairpin apex (Turn 6)
+  { x: 880, y: 250 }, // Saçtoka çıkışı
+  { x: 820, y: 280 }, // Mirabeau Bas (Turn 7)
+  { x: 780, y: 320 }, // Portier girişi
+  { x: 830, y: 370 }, // Portier apex (Turn 8)
+  { x: 880, y: 420 }, // Tünel girişi
+  { x: 870, y: 480 }, // Tünel içi (hızlı viraj)
+  { x: 800, y: 510 }, // Tünel çıkışı
+  { x: 700, y: 510 }, // Şikan öncesi
+  { x: 650, y: 470 }, // Nouvelle Chicane sol (Turn 10)
+  { x: 610, y: 490 }, // Nouvelle Chicane sağ (Turn 11)
+  { x: 520, y: 500 }, // Tabac virajı (Turn 12)
+  { x: 430, y: 510 }, // Louis Chiron (Turn 13)
+  { x: 380, y: 470 }, // Yüzme Havuzu şikanı (Turn 14)
+  { x: 320, y: 510 }, // Havuz çıkışı (Turn 16)
+  { x: 230, y: 510 }, // La Rascasse frenajı
+  { x: 170, y: 470 }, // La Rascasse içi (Turn 17-18)
+  { x: 120, y: 490 }, // Anthony Noghes (Turn 19)
+];
+
 export const MONACO_GEOMETRY: CircuitGeometry = {
   trackId: 'track_monaco',
   viewBox: { width: 1000, height: 600 },
-  points: [
-    { x: 200, y: 480 }, // Start / Finish
-    { x: 360, y: 480 }, // Sainte Devote frenajı
-    { x: 390, y: 440 }, // Sainte Devote içi
-    { x: 420, y: 350 }, // Beau Rivage yokuşu
-    { x: 450, y: 250 }, // Massenet girişi
-    { x: 520, y: 200 }, // Casino Meydanı
-    { x: 580, y: 220 }, // Mirabeau Haute
-    { x: 620, y: 270 }, // Grand Hotel Saçtoka (Fairmont Hairpin)
-    { x: 580, y: 310 }, // Mirabeau Bas
-    { x: 630, y: 340 }, // Portier (Deniz kıyısına iniş)
-    { x: 750, y: 360 }, // Tünel içi (hızlı karanlık bölüm)
-    { x: 850, y: 370 }, // Tünel çıkışı
-    { x: 870, y: 430 }, // Nouvelle Chicane
-    { x: 830, y: 470 }, // Tabac virajı
-    { x: 720, y: 480 }, // Louis Chiron (Havuz bölümü 1)
-    { x: 620, y: 520 }, // Havuz bölümü şikanı
-    { x: 500, y: 530 }, // Rascasse frenajı
-    { x: 450, y: 500 }, // Rascasse dar virajı
-    { x: 370, y: 520 }, // Anthony Noghes son virajı
-    { x: 200, y: 480 }, // Start / Finish bağlanışı
-  ],
+  points: smoothClosedSpline(MONACO_RAW_POINTS, 6),
   pitLanePoints: [
-    { x: 460, y: 540 }, // Pit girişi
-    { x: 300, y: 510 }, // Pit yolu
-    { x: 210, y: 490 }, // Pit çıkışı
+    { x: 230, y: 535 }, // Pit girişi
+    { x: 330, y: 535 }, // Pit yolu
+    { x: 160, y: 455 }, // Pit çıkışı
   ],
-  startFinishPoint: { x: 250, y: 480 },
+  startFinishPoint: { x: 200, y: 440 },
   sector1EndPct: 0.33,
   sector2EndPct: 0.67,
 };
 
 // 3. Silverstone (Northamptonshire Airfield Circuit) 2B Koordinat Eğrisi
-// Hamilton Straight, Abbey, Farm, Village, The Loop, Aintree, Wellington Düzlüğü,
-// Brooklands, Luffield, Woodcote, Copse, Maggotts-Becketts-Chapel, Hangar Düzlüğü, Stowe, Vale, Club.
+const SILVERSTONE_RAW_POINTS: Point2D[] = [
+  { x: 380, y: 520 }, // Hamilton Straight (Start / Finish)
+  { x: 500, y: 520 }, // Abbey frenajı
+  { x: 580, y: 490 }, // Abbey apex (Turn 1)
+  { x: 640, y: 430 }, // Farm Curve (Turn 2)
+  { x: 670, y: 360 }, // Village virajı (Turn 3)
+  { x: 610, y: 320 }, // The Loop girişi
+  { x: 540, y: 340 }, // The Loop hairpin (Turn 4)
+  { x: 520, y: 390 }, // The Loop içi
+  { x: 550, y: 430 }, // Aintree çıkışı (Turn 5)
+  { x: 660, y: 430 }, // Wellington Düzlüğü
+  { x: 800, y: 420 }, // Wellington sonu
+  { x: 880, y: 380 }, // Brooklands (Turn 6)
+  { x: 920, y: 310 }, // Luffield apex (Turn 7)
+  { x: 890, y: 240 }, // Luffield çıkışı
+  { x: 820, y: 210 }, // Woodcote (Turn 8)
+  { x: 740, y: 200 }, // National Straight
+  { x: 640, y: 190 }, // Copse frenajı
+  { x: 560, y: 130 }, // Copse apex (Turn 9)
+  { x: 490, y: 80 },  // Maggotts (Turn 10-11)
+  { x: 430, y: 110 }, // Becketts (Turn 12-13)
+  { x: 380, y: 80 },  // Chapel (Turn 14)
+  { x: 260, y: 140 }, // Hangar Düzlüğü (hızlı iniş)
+  { x: 140, y: 220 }, // Hangar sonu
+  { x: 90,  y: 290 }, // Stowe apex (Turn 15)
+  { x: 100, y: 370 }, // Stowe çıkışı
+  { x: 160, y: 430 }, // Vale şikanı (Turn 16)
+  { x: 220, y: 470 }, // Club girişi (Turn 17)
+  { x: 290, y: 510 }, // Club apex (Turn 18)
+];
+
 export const SILVERSTONE_GEOMETRY: CircuitGeometry = {
   trackId: 'track_silverstone',
   viewBox: { width: 1000, height: 600 },
-  points: [
-    { x: 380, y: 480 }, // 0.00 Hamilton Straight (Start / Finish)
-    { x: 480, y: 480 }, // Abbey girişi
-    { x: 530, y: 450 }, // Abbey apex
-    { x: 550, y: 410 }, // Farm Curve
-    { x: 520, y: 370 }, // Village virajı
-    { x: 460, y: 360 }, // The Loop girişi
-    { x: 430, y: 390 }, // The Loop içi
-    { x: 450, y: 420 }, // The Loop çıkışı
-    { x: 500, y: 430 }, // Aintree
-    { x: 620, y: 420 }, // Wellington Düzlüğü
-    { x: 740, y: 410 }, // Wellington sonu
-    { x: 780, y: 380 }, // Brooklands
-    { x: 800, y: 330 }, // Luffield
-    { x: 760, y: 290 }, // Woodcote
-    { x: 700, y: 270 }, // Ulusal Düzlük
-    { x: 620, y: 240 }, // Copse frenajı
-    { x: 580, y: 190 }, // Copse apex
-    { x: 520, y: 170 }, // Maggotts
-    { x: 460, y: 190 }, // Becketts
-    { x: 410, y: 160 }, // Chapel çıkışı
-    { x: 260, y: 200 }, // Hangar Düzlüğü (hızlı iniş)
-    { x: 150, y: 240 }, // Stowe frenajı
-    { x: 120, y: 290 }, // Stowe apex
-    { x: 160, y: 370 }, // Vale şikanı
-    { x: 220, y: 410 }, // Club virajı girişi
-    { x: 300, y: 460 }, // Club çıkışı (Start/Finish'e bağlanış)
-    { x: 380, y: 480 }, // 1.00 Tur Sonu
-  ],
+  points: smoothClosedSpline(SILVERSTONE_RAW_POINTS, 6),
   pitLanePoints: [
-    { x: 270, y: 460 }, // Pit girişi
-    { x: 380, y: 460 }, // Pit garajları (The Wing)
-    { x: 500, y: 460 }, // Pit çıkışı
+    { x: 280, y: 555 }, // Pit girişi
+    { x: 420, y: 555 }, // The Wing garajları
+    { x: 560, y: 545 }, // Pit çıkışı
   ],
-  startFinishPoint: { x: 400, y: 480 },
+  startFinishPoint: { x: 410, y: 520 },
   sector1EndPct: 0.32,
   sector2EndPct: 0.68,
 };
@@ -189,3 +247,33 @@ export function getCoordinatesAtLapProgress(geometry: CircuitGeometry, progressP
 export function getPitLaneCoordinates(geometry: CircuitGeometry, progressPct: number): Point2D {
   return getCoordinatesOnPolyline(geometry.pitLanePoints, progressPct);
 }
+
+/**
+ * Verilen tur yüzdesindeki pist yönünü (teğet ve dik normal vektörlerini) hesaplar.
+ * Sektör çizgilerini ve Start/Finish çizgisini piste tam dik çizebilmek için kullanılır.
+ */
+export function getTrackNormalAtLapProgress(
+  geometry: CircuitGeometry,
+  progressPct: number
+): {
+  point: Point2D;
+  normal: { x: number; y: number };
+} {
+  const point = getCoordinatesAtLapProgress(geometry, progressPct);
+  const dt = 0.005;
+  const pForward = getCoordinatesAtLapProgress(geometry, (progressPct + dt) % 1.0);
+  const pBackward = getCoordinatesAtLapProgress(geometry, (progressPct - dt + 1.0) % 1.0);
+
+  const dx = pForward.x - pBackward.x;
+  const dy = pForward.y - pBackward.y;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+  return {
+    point,
+    normal: {
+      x: -dy / len,
+      y: dx / len,
+    },
+  };
+}
+
