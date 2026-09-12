@@ -8,7 +8,9 @@ import {
   TireCompound,
   Track,
 } from '../types';
-import { AeroPowerUnitModel } from './AeroPowerUnitModel';
+import { LapTimeCalculator } from './LapTimeCalculator';
+import { OvertakeEngine } from './OvertakeEngine';
+import { PitStopEngine } from './PitStopEngine';
 import { TireModel } from './TireModel';
 
 export interface RaceSimulationConfig {
@@ -19,9 +21,9 @@ export interface RaceSimulationConfig {
 }
 
 export class RaceSimulation {
-  private track: Track;
-  private teamsMap: Map<string, Team>;
-  private driversMap: Map<string, Driver>;
+  private readonly track: Track;
+  private readonly teamsMap: Map<string, Team>;
+  private readonly driversMap: Map<string, Driver>;
 
   private cars: CarState[] = [];
   private currentLap = 0;
@@ -29,11 +31,14 @@ export class RaceSimulation {
   private trackWetnessPct = 0.0;
   private flag: RaceFlag = 'GREEN';
   private events: RaceEvent[] = [];
+
   private fastestLap: {
     driverId: string;
     lapTimeSec: number;
     lapNumber: number;
   } | null = null;
+
+  private sessionBestSectors: [number | null, number | null, number | null] = [null, null, null];
 
   constructor(config: RaceSimulationConfig) {
     this.track = config.track;
@@ -44,10 +49,9 @@ export class RaceSimulation {
   }
 
   /**
-   * Initializes 22 cars on the starting grid based on team/driver baseline strength.
+   * Sets up initial grid ordering based on qualifying/base strength.
    */
   private initializeGrid(defaultTire: TireCompound): void {
-    // Generate grid ordered roughly by driver skill + team power for a realistic starting grid
     const driverList = Array.from(this.driversMap.values());
     const sortedGrid = [...driverList].sort((a, b) => {
       const teamA = this.getTeamForDriver(a.id);
@@ -70,20 +74,26 @@ export class RaceSimulation {
         currentLapTimeSec: 0,
         lastLapTimeSec: null,
         bestLapTimeSec: null,
-        gapToLeaderSec: index * 0.35, // Starting grid gap
+        sectorTimes: [0, 0, 0],
+        sectorStatuses: ['YELLOW', 'YELLOW', 'YELLOW'],
+        personalBestSectors: [null, null, null],
+        gapToLeaderSec: index * 0.35,
         intervalToAheadSec: index === 0 ? 0 : 0.35,
         aeroMode: 'Z_MODE',
-        batterySoCPct: 85.0 + (Math.random() * 10), // 85-95% initial charge
+        batterySoCPct: 85.0 + (Math.random() * 10),
         momAvailable: false,
         momActive: false,
+        defensiveDeployActive: false,
         paceMode: 'BALANCED',
         engineMode: 'STANDARD',
         tires: TireModel.createTire(defaultTire),
+        inDirtyAir: false,
         inPitLane: false,
         pitStopsCount: 0,
         pitStopServiceTimeSec: 0,
         pitRequestedNextLap: false,
         selectedNextCompound: 'HARD',
+        doubleStackDelayed: false,
         isDnf: false,
         stressLevelPct: 10,
         hasLockup: false,
@@ -91,7 +101,7 @@ export class RaceSimulation {
     });
   }
 
-  private getTeamForDriver(driverId: string): Team | undefined {
+  public getTeamForDriver(driverId: string): Team | undefined {
     for (const team of this.teamsMap.values()) {
       if (team.driverIds.includes(driverId)) return team;
     }
@@ -99,7 +109,7 @@ export class RaceSimulation {
   }
 
   /**
-   * Simulates a full lap across all 22 cars.
+   * Simulates a full lap across all 22 cars using modular sub-engines.
    */
   public simulateLap(): SimulationSnapshot {
     if (this.currentLap >= this.track.totalLaps) {
@@ -108,7 +118,17 @@ export class RaceSimulation {
 
     this.currentLap += 1;
 
-    // 1. Process each car's lap time
+    // Track which teams have pit requests this lap for double-stack detection
+    const pittingDriversByTeam = new Map<string, string[]>();
+    for (const car of this.cars) {
+      if (car.pitRequestedNextLap) {
+        const list = pittingDriversByTeam.get(car.teamId) || [];
+        list.push(car.driverId);
+        pittingDriversByTeam.set(car.teamId, list);
+      }
+    }
+
+    // 1. Process Each Car's Lap Time
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       if (car.isDnf) continue;
@@ -116,117 +136,79 @@ export class RaceSimulation {
       const driver = this.driversMap.get(car.driverId)!;
       const team = this.teamsMap.get(car.teamId)!;
 
-      // Handle Pit Stop
-      let lapPitLoss = 0.0;
+      // Check Dirty Air (within 0.8s of car ahead and not leader)
+      car.inDirtyAir = i > 0 && car.intervalToAheadSec <= 0.8;
+
+      // Handle Pit Stop via PitStopEngine
+      let pitLossSec = 0.0;
       if (car.pitRequestedNextLap) {
-        lapPitLoss = this.executePitStop(car, team, driver);
-      }
+        const teamPittingList = pittingDriversByTeam.get(car.teamId) || [];
+        const teammateAlsoPitting = teamPittingList.length > 1;
+        // Teammate is ahead on track if their index in cars array is smaller
+        const teammateId = team.driverIds.find((id) => id !== car.driverId);
+        const teammateIdx = this.cars.findIndex((c) => c.driverId === teammateId);
+        const isTeammateBehind = teammateIdx > i;
 
-      // Base track lap time
-      let lapTime = this.track.baseLapTimeSec + lapPitLoss;
-
-      // Driver skill factor (-0.5s for 98 skill vs 80 skill)
-      const driverPaceDelta = -((driver.skill - 82) / 18) * 0.55;
-      lapTime += driverPaceDelta;
-
-      // Pace mode factor
-      let paceWearMultiplier = 1.0;
-      if (car.paceMode === 'PUSH') {
-        lapTime -= 0.45;
-        paceWearMultiplier = 1.45;
-      } else if (car.paceMode === 'CONSERVE') {
-        lapTime += 0.40;
-        paceWearMultiplier = 0.75;
-      }
-
-      // Tire Delta & Degradation
-      const tireDelta = TireModel.calculateTireDeltaSec(
-        car.tires,
-        this.trackWetnessPct,
-        team.chassisBalance
-      );
-      lapTime += tireDelta.deltaSec;
-
-      // Check if Cliff just hit
-      if (tireDelta.isCliff && !car.tires.isCliffHit) {
-        this.addEvent({
-          lap: this.currentLap,
-          timestampSec: this.raceTimeSec,
-          type: 'CLIFF_HIT',
-          driverId: driver.id,
-          message: `${driver.shortCode}: "Tires are dead! Hit the cliff!" (+2.5s/lap loss)`,
-          severity: 'WARNING',
+        const pitResult = PitStopEngine.executeStop({
+          car,
+          team,
+          driver,
+          track: this.track,
+          currentLap: this.currentLap,
+          raceTimeSec: this.raceTimeSec,
+          teammateAlsoPitting,
+          isTeammateBehind,
         });
+
+        pitLossSec = pitResult.lapTimeLossSec;
+        pitResult.newEvents.forEach((evt) => this.addEvent(evt));
       }
 
-      // Lockup check
-      car.hasLockup = false;
-      const lockupRoll = Math.random() * 100;
-      if (lockupRoll < tireDelta.lockupRiskPct) {
-        car.hasLockup = true;
-        lapTime += 1.2; // Lost time running wide
-        this.addEvent({
-          lap: this.currentLap,
-          timestampSec: this.raceTimeSec,
-          type: 'LOCKUP',
-          driverId: driver.id,
-          message: `${driver.shortCode} locked up into Turn 1! Flat spot warning.`,
-          severity: 'TACTICAL',
-        });
-      }
-
-      // Apply tire degradation for the completed lap
-      car.tires = TireModel.degradeTire(
-        car.tires,
-        paceWearMultiplier,
-        driver.tireManagement,
-        this.trackWetnessPct
-      );
-
-      // 2026 Aero and Power Unit (MOM & Battery)
-      const aeroPower = AeroPowerUnitModel.calculateLapAeroPower({
+      // Calculate Lap and Sector Times via LapTimeCalculator
+      const lapCalcResult = LapTimeCalculator.calculateLapTime({
+        car,
+        driver,
+        team,
         track: this.track,
-        engineMode: car.engineMode,
-        currentBatterySoC: car.batterySoCPct,
-        momRequestedOrEligible: car.intervalToAheadSec <= 1.0,
-        intervalToAheadSec: car.intervalToAheadSec,
-        teamEnginePower: team.enginePower,
-        teamAeroEfficiency: team.aeroEfficiency,
+        currentLap: this.currentLap,
+        raceTimeSec: this.raceTimeSec,
+        trackWetnessPct: this.trackWetnessPct,
+        pitLossSec,
+        sessionBestSectors: this.sessionBestSectors,
       });
 
-      lapTime += aeroPower.lapTimeDeltaSec;
-      car.batterySoCPct = aeroPower.newBatterySoC;
-      car.momActive = aeroPower.momActive;
+      // Update car sector and lap timing state
+      car.lastLapTimeSec = lapCalcResult.lapTimeSec;
+      car.sectorTimes = lapCalcResult.sectorTimes;
+      car.sectorStatuses = lapCalcResult.sectorStatuses;
+      car.hasLockup = lapCalcResult.hasLockup;
+      lapCalcResult.newEvents.forEach((evt) => this.addEvent(evt));
 
-      if (car.momActive) {
-        this.addEvent({
-          lap: this.currentLap,
-          timestampSec: this.raceTimeSec,
-          type: 'MOM_DEPLOYED',
-          driverId: driver.id,
-          message: `${driver.shortCode} engaged 2026 Manual Override Mode (350kW full deploy)`,
-          severity: 'INFO',
-        });
+      // Update Personal Best and Session Best Sectors
+      lapCalcResult.sectorTimes.forEach((time, idx) => {
+        // Session best (Purple)
+        if (this.sessionBestSectors[idx] === null || time < this.sessionBestSectors[idx]!) {
+          this.sessionBestSectors[idx] = time;
+        }
+        // Personal best (Green)
+        if (car.personalBestSectors[idx] === null || time < car.personalBestSectors[idx]!) {
+          car.personalBestSectors[idx] = time;
+        }
+      });
+
+      // Best lap tracking
+      if (car.bestLapTimeSec === null || lapCalcResult.lapTimeSec < car.bestLapTimeSec) {
+        car.bestLapTimeSec = lapCalcResult.lapTimeSec;
       }
 
-      // Small natural lap time variance (+/- 0.12s)
-      const variance = (Math.random() - 0.5) * 0.24;
-      lapTime += variance;
-
-      // Save lap times
-      car.lastLapTimeSec = Math.round(lapTime * 1000) / 1000;
-      if (car.bestLapTimeSec === null || lapTime < car.bestLapTimeSec) {
-        car.bestLapTimeSec = car.lastLapTimeSec;
-      }
-
-      // Check for fastest lap of the race (excluding pit laps)
+      // Session Fastest Lap (only on clean racing laps)
       if (
-        lapPitLoss === 0 &&
-        (!this.fastestLap || lapTime < this.fastestLap.lapTimeSec)
+        pitLossSec === 0 &&
+        (!this.fastestLap || lapCalcResult.lapTimeSec < this.fastestLap.lapTimeSec)
       ) {
         this.fastestLap = {
           driverId: driver.id,
-          lapTimeSec: car.lastLapTimeSec,
+          lapTimeSec: lapCalcResult.lapTimeSec,
           lapNumber: this.currentLap,
         };
         this.addEvent({
@@ -234,7 +216,7 @@ export class RaceSimulation {
           timestampSec: this.raceTimeSec,
           type: 'FASTEST_LAP',
           driverId: driver.id,
-          message: `🟣 ${driver.shortCode} set the FASTEST LAP: ${this.formatTime(car.lastLapTimeSec)}`,
+          message: `🟣 FASTEST LAP: ${driver.shortCode} — ${this.formatTime(lapCalcResult.lapTimeSec)}`,
           severity: 'TACTICAL',
         });
       }
@@ -243,13 +225,13 @@ export class RaceSimulation {
       car.totalDistanceMeters += this.track.lengthMeters;
     }
 
-    // 2. Resolve Overtakes & Position Changes
+    // 2. Resolve Overtakes via OvertakeEngine
     this.resolveOvertakes();
 
-    // 3. Recalculate Gaps & Intervals
+    // 3. Update Live Timing Intervals & Gaps
     this.updateGapsAndIntervals();
 
-    // 4. Advance race clock by the leader's lap time
+    // 4. Advance race clock
     const leaderLapTime = this.cars[0]?.lastLapTimeSec || this.track.baseLapTimeSec;
     this.raceTimeSec += leaderLapTime;
 
@@ -257,92 +239,40 @@ export class RaceSimulation {
   }
 
   /**
-   * Executes a pit stop for the car.
-   */
-  private executePitStop(car: CarState, team: Team, driver: Driver): number {
-    car.pitStopsCount += 1;
-    car.pitRequestedNextLap = false;
-
-    // Pit lane traversal time (e.g. 21.5s under pit limiter)
-    const laneTime = this.track.pitLaneLossSec;
-
-    // Pit crew service time (standard: 2.1s - 2.8s)
-    let serviceTime = 2.0 + (Math.max(0, 100 - team.pitCrewRating) * 0.015);
-    
-    // Chance of stuck wheel nut / pit error (higher if pit crew rating is low)
-    const mistakeChance = Math.max(2, (100 - team.pitCrewRating) * 0.12);
-    if (Math.random() * 100 < mistakeChance) {
-      const extraDelay = 3.5 + (Math.random() * 4.0); // 3.5s to 7.5s delay
-      serviceTime += extraDelay;
-      this.addEvent({
-        lap: this.currentLap,
-        timestampSec: this.raceTimeSec,
-        type: 'PIT_ERROR',
-        driverId: driver.id,
-        message: `⚠️ PIT ERROR for ${driver.shortCode}! Wheel nut cross-threaded! Service: ${serviceTime.toFixed(1)}s`,
-        severity: 'DANGER',
-      });
-    } else {
-      this.addEvent({
-        lap: this.currentLap,
-        timestampSec: this.raceTimeSec,
-        type: 'PIT_EXIT',
-        driverId: driver.id,
-        message: `${driver.shortCode} box clean! Service: ${serviceTime.toFixed(1)}s -> Switched to ${car.selectedNextCompound}`,
-        severity: 'INFO',
-      });
-    }
-
-    car.pitStopServiceTimeSec = Math.round(serviceTime * 10) / 10;
-    car.tires = TireModel.createTire(car.selectedNextCompound);
-
-    return laneTime + serviceTime;
-  }
-
-  /**
-   * Resolves overtakes between adjacent cars based on net delta, 2026 MOM, and racecraft.
+   * Iterates through the field and resolves overtaking duels.
    */
   private resolveOvertakes(): void {
     for (let i = this.cars.length - 1; i > 0; i--) {
       const chaser = this.cars[i];
       const defender = this.cars[i - 1];
 
-      if (chaser.isDnf || defender.isDnf) continue;
-
       const chaserDriver = this.driversMap.get(chaser.driverId)!;
       const defenderDriver = this.driversMap.get(defender.driverId)!;
 
-      // Delta advantage
-      const chaserLap = chaser.lastLapTimeSec || 999;
-      const defenderLap = defender.lastLapTimeSec || 999;
-      const deltaAdvantage = defenderLap - chaserLap; // Positive means chaser was faster
+      const result = OvertakeEngine.evaluateOvertake({
+        chaser,
+        defender,
+        chaserDriver,
+        defenderDriver,
+        currentLap: this.currentLap,
+        raceTimeSec: this.raceTimeSec,
+        chaserPosition: i + 1,
+      });
 
-      // If chaser was faster and was close enough
-      if (deltaAdvantage > 0.35 && chaser.intervalToAheadSec <= 1.2) {
-        // Racecraft calculation
-        const overtakeScore = (chaserDriver.racecraft * 1.2) + (deltaAdvantage * 30) + (chaser.momActive ? 25 : 0);
-        const defenseScore = (defenderDriver.racecraft * 1.1) + (defender.momActive ? 15 : 0);
+      if (result.success) {
+        // Swap positions in the running order
+        this.cars[i] = defender;
+        this.cars[i - 1] = chaser;
 
-        if (overtakeScore > defenseScore) {
-          // Swap positions
-          this.cars[i] = defender;
-          this.cars[i - 1] = chaser;
-
-          this.addEvent({
-            lap: this.currentLap,
-            timestampSec: this.raceTimeSec,
-            type: 'OVERTAKE',
-            driverId: chaserDriver.id,
-            message: `🔥 OVERTAKE: P${i} ${chaserDriver.shortCode} passed ${defenderDriver.shortCode} ${chaser.momActive ? 'using 2026 MOM boost!' : 'down the straight!'}`,
-            severity: 'TACTICAL',
-          });
+        if (result.event) {
+          this.addEvent(result.event);
         }
       }
     }
   }
 
   /**
-   * Updates gap to leader and interval to car ahead.
+   * Recalculates leader gaps and interval deltas.
    */
   private updateGapsAndIntervals(): void {
     let cumulativeGap = 0.0;
@@ -354,7 +284,6 @@ export class RaceSimulation {
         car.intervalToAheadSec = 0.0;
       } else {
         const ahead = this.cars[i - 1];
-        // Calculate natural delta gap
         const stepInterval = Math.max(
           0.15,
           (car.lastLapTimeSec || 80) - (ahead.lastLapTimeSec || 80) + ahead.intervalToAheadSec * 0.8
@@ -367,7 +296,7 @@ export class RaceSimulation {
   }
 
   /**
-   * Command: Request pit stop for a specific driver on the next lap.
+   * Strategist Command: Box for tires on the next lap.
    */
   public orderBox(driverId: string, nextCompound: TireCompound): boolean {
     const car = this.cars.find((c) => c.driverId === driverId);
@@ -382,7 +311,7 @@ export class RaceSimulation {
       timestampSec: this.raceTimeSec,
       type: 'RADIO_MESSAGE',
       driverId,
-      message: `📻 PIT WALL -> ${driver.shortCode}: "BOX, BOX, BOX! Pit this lap for ${nextCompound} tires!"`,
+      message: `📻 PIT WALL -> ${driver.shortCode}: "BOX, BOX! Box this lap for fresh ${nextCompound} tires."`,
       severity: 'TACTICAL',
     });
 
@@ -390,7 +319,7 @@ export class RaceSimulation {
   }
 
   /**
-   * Command: Set driver driving pace mode (CONSERVE / BALANCED / PUSH).
+   * Strategist Command: Pace mode.
    */
   public setPaceMode(driverId: string, mode: 'CONSERVE' | 'BALANCED' | 'PUSH'): void {
     const car = this.cars.find((c) => c.driverId === driverId);
@@ -398,7 +327,7 @@ export class RaceSimulation {
   }
 
   /**
-   * Command: Set 2026 Power Unit engine mode (ECO / STANDARD / OVERTAKE).
+   * Strategist Command: 2026 Engine & battery deployment mode.
    */
   public setEngineMode(driverId: string, mode: 'ECO' | 'STANDARD' | 'OVERTAKE'): void {
     const car = this.cars.find((c) => c.driverId === driverId);
@@ -410,7 +339,6 @@ export class RaceSimulation {
       ...event,
       id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     });
-    // Keep max 50 recent events
     if (this.events.length > 50) {
       this.events.pop();
     }
@@ -425,6 +353,7 @@ export class RaceSimulation {
       trackWetnessPct: this.trackWetnessPct,
       leaderDriverId: this.cars[0]?.driverId || '',
       fastestLap: this.fastestLap,
+      sessionBestSectors: [...this.sessionBestSectors],
       leaderboard: [...this.cars],
       recentEvents: [...this.events],
     };

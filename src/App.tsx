@@ -121,10 +121,11 @@ export default function App() {
                   <th className="py-1 px-2">POS</th>
                   <th className="py-1 px-2">PILOT</th>
                   <th className="py-1 px-2">TAKIM</th>
-                  <th className="py-1 px-2">LASTİK</th>
+                  <th className="py-1 px-2">LASTİK & ISI</th>
                   <th className="py-1 px-2">SAĞLIK</th>
-                  <th className="py-1 px-2">BATARYA (MOM)</th>
-                  <th className="py-1 px-2">FARK (GAP)</th>
+                  <th className="py-1 px-2">BATARYA</th>
+                  <th className="py-1 px-2">FARK</th>
+                  <th className="py-1 px-2">SEKTÖRLER</th>
                   <th className="py-1 px-2">SON TUR</th>
                   <th className="py-1 px-2 text-right">TAKTIK</th>
                 </tr>
@@ -157,21 +158,31 @@ export default function App() {
                         {team.shortName}
                       </td>
                       <td className="py-1.5 px-2">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            car.tires.compound === 'SOFT'
-                              ? 'bg-red-950 text-red-400 border border-red-800'
-                              : car.tires.compound === 'MEDIUM'
-                              ? 'bg-yellow-950 text-yellow-400 border border-yellow-800'
-                              : 'bg-neutral-800 text-neutral-200 border border-neutral-700'
-                          }`}
-                        >
-                          {car.tires.compound[0]} ({car.tires.ageLaps}L)
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              car.tires.compound === 'SOFT'
+                                ? 'bg-red-950 text-red-400 border border-red-800'
+                                : car.tires.compound === 'MEDIUM'
+                                ? 'bg-yellow-950 text-yellow-400 border border-yellow-800'
+                                : 'bg-neutral-800 text-neutral-200 border border-neutral-700'
+                            }`}
+                          >
+                            {car.tires.compound[0]} ({car.tires.ageLaps}L)
+                          </span>
+                          <span className="text-[10px] text-neutral-400 font-mono">
+                            {car.tires.tempCelsius.toFixed(0)}°C
+                          </span>
+                          {car.inDirtyAir && (
+                            <span className="text-[9px] text-orange-400 font-mono" title="Kirli hava: Lastik ısınıyor">
+                              💨
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-1.5 px-2">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-12 bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+                          <div className="w-10 bg-neutral-800 rounded-full h-1.5 overflow-hidden">
                             <div
                               className={`h-full ${
                                 isCliff ? 'bg-red-500 animate-pulse' : 'bg-emerald-500'
@@ -206,6 +217,27 @@ export default function App() {
                         ) : (
                           `+${car.gapToLeaderSec.toFixed(1)}s`
                         )}
+                      </td>
+                      <td className="py-1.5 px-2">
+                        <div className="flex items-center gap-1 text-[10px] font-mono">
+                          {car.sectorTimes.map((secTime, sIdx) => {
+                            const status = car.sectorStatuses[sIdx];
+                            return (
+                              <span
+                                key={sIdx}
+                                className={`px-1 py-0.5 rounded text-[9px] font-bold ${
+                                  status === 'PURPLE'
+                                    ? 'bg-purple-950 text-purple-300 border border-purple-800'
+                                    : status === 'GREEN'
+                                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                    : 'bg-neutral-800/80 text-neutral-400'
+                                }`}
+                              >
+                                {secTime > 0 ? secTime.toFixed(1) : '-'}
+                              </span>
+                            );
+                          })}
+                        </div>
                       </td>
                       <td className="py-1.5 px-2 text-neutral-400 font-mono text-[11px]">
                         {car.lastLapTimeSec ? `${car.lastLapTimeSec.toFixed(3)}s` : '---'}

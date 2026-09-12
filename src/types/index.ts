@@ -79,6 +79,8 @@ export interface Track {
   curvePathSvg?: string;     // 2D vector circuit path for radar
 }
 
+export type SectorStatus = 'PURPLE' | 'GREEN' | 'YELLOW';
+
 export interface CarState {
   driverId: string;
   teamId: string;
@@ -94,6 +96,9 @@ export interface CarState {
   currentLapTimeSec: number;
   lastLapTimeSec: number | null;
   bestLapTimeSec: number | null;
+  sectorTimes: [number, number, number];
+  sectorStatuses: [SectorStatus, SectorStatus, SectorStatus];
+  personalBestSectors: [number | null, number | null, number | null];
   gapToLeaderSec: number;
   intervalToAheadSec: number;
 
@@ -102,6 +107,7 @@ export interface CarState {
   batterySoCPct: number;     // State of Charge: 0.0 to 100.0%
   momAvailable: boolean;     // Manual Override Mode available (e.g. within 1.0s of car ahead at detection point)
   momActive: boolean;        // Manual Override actively deploying 350kW boost
+  defensiveDeployActive: boolean; // Leading car using electrical reserve to defend
 
   // Stratejist & Driving modes
   paceMode: PaceMode;
@@ -109,6 +115,7 @@ export interface CarState {
 
   // Tires
   tires: TireState;
+  inDirtyAir: boolean;       // Stuck behind another car within 0.8s, causing tire overheating
 
   // Pit Stop status
   inPitLane: boolean;
@@ -116,6 +123,7 @@ export interface CarState {
   pitStopServiceTimeSec: number;
   pitRequestedNextLap: boolean;
   selectedNextCompound: TireCompound;
+  doubleStackDelayed: boolean; // Waited in pit box behind teammate
 
   // Reliability & Status
   isDnf: boolean;
@@ -137,6 +145,7 @@ export interface RaceEvent {
     | 'PIT_ENTRY'
     | 'PIT_EXIT'
     | 'PIT_ERROR'
+    | 'DOUBLE_STACK'
     | 'FASTEST_LAP'
     | 'MOM_DEPLOYED'
     | 'RADIO_MESSAGE'
@@ -158,6 +167,8 @@ export interface SimulationSnapshot {
     lapTimeSec: number;
     lapNumber: number;
   } | null;
+  sessionBestSectors: [number | null, number | null, number | null];
   leaderboard: CarState[];    // Sorted P1 to P22
   recentEvents: RaceEvent[];
 }
+

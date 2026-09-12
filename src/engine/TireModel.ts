@@ -123,20 +123,22 @@ export class TireModel {
   }
 
   /**
-   * Applies degradation for 1 lap completed based on driver pace, tire care, and weather.
+   * Applies degradation for 1 lap completed based on driver pace, tire care, weather, and aerodynamic wake.
    */
   public static degradeTire(
     currentTire: TireState,
-    paceMultiplier: number, // e.g. Conserve = 0.75, Balanced = 1.0, Push = 1.45
-    driverTireCare: number,  // 1-100
-    trackWetnessPct: number
+    paceMultiplier: number,  // e.g. Conserve = 0.75, Balanced = 1.0, Push = 1.45
+    driverTireCare: number,   // 1-100
+    trackWetnessPct: number,
+    inDirtyAir: boolean = false
   ): TireState {
     const spec = TIRE_SPECS[currentTire.compound];
     
     // Tire care factor: 100 rating reduces wear by ~25%
     const careDiscount = 1 - ((driverTireCare - 50) / 200); // 0.75 to 1.15
+    const dirtyAirWearMultiplier = inDirtyAir ? 1.22 : 1.0; // Turbulent wake causes micro-sliding
 
-    let lapWear = spec.degradationPerLap * paceMultiplier * careDiscount;
+    let lapWear = spec.degradationPerLap * paceMultiplier * careDiscount * dirtyAirWearMultiplier;
 
     // Wet tire on dry track overheats and shreds 2.5x faster
     if ((spec.compound === 'INTERMEDIATE' || spec.compound === 'WET') && trackWetnessPct < 15) {
@@ -146,12 +148,22 @@ export class TireModel {
     const newHealth = Math.max(0, currentTire.healthPct - lapWear);
     const cliffHit = newHealth <= spec.cliffThresholdPct;
 
+    // Temperature dynamics: Clean air cools towards 100°C; Push and Dirty Air heat up
+    let tempDelta = 0;
+    if (paceMultiplier > 1.2) tempDelta += 3.5;
+    else if (paceMultiplier < 0.9) tempDelta -= 2.5;
+
+    if (inDirtyAir) tempDelta += 3.0; // Dirty air cooks tires
+    else if (currentTire.tempCelsius > 102) tempDelta -= 1.5; // Cooling in clean air
+
+    const newTemp = Math.max(80, Math.min(138, currentTire.tempCelsius + tempDelta));
+
     return {
       compound: currentTire.compound,
       healthPct: Math.round(newHealth * 10) / 10,
       ageLaps: currentTire.ageLaps + 1,
       isCliffHit: cliffHit,
-      tempCelsius: Math.min(135, currentTire.tempCelsius + (paceMultiplier > 1.2 ? 3 : -1)),
+      tempCelsius: Math.round(newTemp * 10) / 10,
     };
   }
 }
