@@ -17,6 +17,7 @@ import { LapTimeCalculator } from './LapTimeCalculator';
 import { OvertakeEngine } from './OvertakeEngine';
 import { PitStopEngine } from './PitStopEngine';
 import { TireModel } from './TireModel';
+import { AERO_2026_CONFIG, DIRTY_AIR_CONFIG } from '../config/simulationConfig';
 
 export interface RaceSimulationConfig {
   track: Track;
@@ -102,6 +103,7 @@ export class RaceSimulation {
         selectedNextCompound: 'HARD',
         doubleStackDelayed: false,
         isDnf: false,
+        isFinished: false,
         stressLevelPct: 10,
         hasLockup: false,
       };
@@ -116,18 +118,15 @@ export class RaceSimulation {
   }
 
   /**
-   * 1 Tur Simüle Et: Tüm 22 araç için 1 turu koşturur.
-   * Adım 1: Pit stopları ve tur zamanlarını hesapla.
-   * Adım 2: Solllama mücadelelerini çöz.
-   * Adım 3: Canlı zamanlama farklarını (Gap/Interval) güncelle.
+   * 1 Tur Simüle Et: Tüm 22 araç için 1 tam turu koşturur.
    */
   public simulateLap(): SimulationSnapshot {
-    // Yarış bittiyse daha fazla tur atma
-    if (this.currentLap >= this.track.totalLaps) {
+    // Yarış tamamlandıysa tur atma
+    if (this.flag === 'CHEQUERED' || this.currentLap >= this.track.totalLaps) {
       return this.getSnapshot();
     }
 
-    this.currentLap += 1;
+    const nextLap = this.currentLap + 1;
 
     // Aynı tur pite giren takım arkadaşlarını tespit ediyoruz (Double-Stack kontrolü için)
     const pittingDriversByTeam = new Map<string, string[]>();
@@ -139,101 +138,18 @@ export class RaceSimulation {
       }
     }
 
-    // 1. Her Bir Aracın Turunu Hesapla
+    // 1. Her bir araç için tur tamamlama boru hattını çalıştır
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       if (car.isDnf) continue;
 
-      const driver = this.driversMap.get(car.driverId)!;
-      const team = this.teamsMap.get(car.teamId)!;
-
-      // Kirli Hava Kontrolü: Eğer öndeki arabaya 0.8 saniyeden yakınsak ve lider değilsek kirli havadayız!
-      car.inDirtyAir = i > 0 && car.intervalToAheadSec <= 0.8;
-
-      // Pit Stop Yönetimi (Eğer stratejist bir önceki tur BOX emri verdiyse)
-      let pitLossSec = 0.0;
-      if (car.pitRequestedNextLap) {
-        const teamPittingList = pittingDriversByTeam.get(car.teamId) || [];
-        const teammateAlsoPitting = teamPittingList.length > 1;
-        const teammateId = team.driverIds.find((id) => id !== car.driverId);
-        const teammateIdx = this.cars.findIndex((c) => c.driverId === teammateId);
-        const isTeammateBehind = teammateIdx > i;
-
-        const pitResult = PitStopEngine.executeStop({
-          car,
-          team,
-          driver,
-          track: this.track,
-          currentLap: this.currentLap,
-          raceTimeSec: this.raceTimeSec,
-          teammateAlsoPitting,
-          isTeammateBehind,
-        });
-
-        pitLossSec = pitResult.lapTimeLossSec;
-        pitResult.newEvents.forEach((evt) => this.addEvent(evt));
-      }
-
-      // Tur ve Sektör Sürelerini Hesapla
-      const lapCalcResult = LapTimeCalculator.calculateLapTime({
-        car,
-        driver,
-        team,
-        track: this.track,
-        currentLap: this.currentLap,
-        raceTimeSec: this.raceTimeSec,
-        trackWetnessPct: this.trackWetnessPct,
-        pitLossSec,
-        sessionBestSectors: this.sessionBestSectors,
-      });
-
-      // Aracın telemetri verilerini güncelle
-      car.lastLapTimeSec = lapCalcResult.lapTimeSec;
-      car.sectorTimes = lapCalcResult.sectorTimes;
-      car.sectorStatuses = lapCalcResult.sectorStatuses;
-      car.hasLockup = lapCalcResult.hasLockup;
-      lapCalcResult.newEvents.forEach((evt) => this.addEvent(evt));
-
-      // Mor ve Yeşil Sektör Kayıtlarını Güncelle
-      lapCalcResult.sectorTimes.forEach((time, idx) => {
-        // Seansın en iyisi (Mor)
-        if (this.sessionBestSectors[idx] === null || time < this.sessionBestSectors[idx]!) {
-          this.sessionBestSectors[idx] = time;
-        }
-        // Pilotun kendi en iyisi (Yeşil)
-        if (car.personalBestSectors[idx] === null || time < car.personalBestSectors[idx]!) {
-          car.personalBestSectors[idx] = time;
-        }
-      });
-
-      // Pilotun en iyi turu
-      if (car.bestLapTimeSec === null || lapCalcResult.lapTimeSec < car.bestLapTimeSec) {
-        car.bestLapTimeSec = lapCalcResult.lapTimeSec;
-      }
-
-      // Seansın En Hızlı Turu (Mor Tur: Pite girilmemiş temiz turlar arasından seçilir)
-      if (
-        pitLossSec === 0 &&
-        (!this.fastestLap || lapCalcResult.lapTimeSec < this.fastestLap.lapTimeSec)
-      ) {
-        this.fastestLap = {
-          driverId: driver.id,
-          lapTimeSec: lapCalcResult.lapTimeSec,
-          lapNumber: this.currentLap,
-        };
-        this.addEvent({
-          lap: this.currentLap,
-          timestampSec: this.raceTimeSec,
-          type: 'FASTEST_LAP',
-          driverId: driver.id,
-          message: `[EN HIZLI TUR] ${driver.shortCode} — ${this.formatTime(lapCalcResult.lapTimeSec)}`,
-          severity: 'TACTICAL',
-        });
-      }
-
-      car.currentLap = this.currentLap;
-      car.totalDistanceMeters += this.track.lengthMeters;
+      this.processCarLapFinish(i, nextLap, pittingDriversByTeam);
+      car.totalDistanceMeters = nextLap * this.track.lengthMeters;
+      car.lapProgressPct = 0.0;
+      car.inPitLane = false;
     }
+
+    this.currentLap = nextLap;
 
     // 2. Sollama Mücadelelerini Çöz (Arkadakiler öndekileri geçebildi mi?)
     this.resolveOvertakes();
@@ -245,7 +161,141 @@ export class RaceSimulation {
     const leaderLapTime = this.cars[0]?.lastLapTimeSec || this.track.baseLapTimeSec;
     this.raceTimeSec += leaderLapTime;
 
+    // 5. Damalı bayrak kontrolü: Lider son turu bitirdi mi?
+    if (this.currentLap >= this.track.totalLaps) {
+      this.finishRace();
+    }
+
     return this.getSnapshot();
+  }
+
+  /**
+   * Bir aracın 1 turu bitirdiği anda çalışan birleşik tur işleme boru hattı.
+   * Hem anlık tur atlamada (simulateLap) hem de 60fps mikro-adımda (simulateTick)
+   * aynı fizik kurallarının, pit operasyonlarının ve lastik aşınmasının çalışmasını garanti eder.
+   */
+  private processCarLapFinish(
+    carIndex: number,
+    lapNumber: number,
+    pittingDriversByTeam?: Map<string, string[]>
+  ): void {
+    const car = this.cars[carIndex];
+    if (car.isDnf) return;
+
+    const driver = this.driversMap.get(car.driverId)!;
+    const team = this.teamsMap.get(car.teamId)!;
+
+    // Kirli Hava Kontrolü: 0.8s altındaysa aerodinamik kayıp ve aşırı ısınma yaşar
+    car.inDirtyAir = carIndex > 0 && car.intervalToAheadSec <= DIRTY_AIR_CONFIG.detectionThresholdSec;
+
+    // Pit Stop Yönetimi: Eğer stratejist BOX emri vermişse
+    let pitLossSec = 0.0;
+    if (car.pitRequestedNextLap) {
+      const teamPittingList = pittingDriversByTeam?.get(car.teamId) || [car.driverId];
+      const teammateAlsoPitting = teamPittingList.length > 1;
+      const teammateId = team.driverIds.find((id) => id !== car.driverId);
+      const teammateIdx = this.cars.findIndex((c) => c.driverId === teammateId);
+      const isTeammateBehind = teammateIdx > carIndex;
+
+      const pitResult = PitStopEngine.executeStop({
+        car,
+        team,
+        driver,
+        track: this.track,
+        currentLap: lapNumber,
+        raceTimeSec: this.raceTimeSec,
+        teammateAlsoPitting,
+        isTeammateBehind,
+      });
+
+      pitLossSec = pitResult.lapTimeLossSec;
+      pitResult.newEvents.forEach((evt) => this.addEvent(evt));
+      car.inPitLane = true;
+    } else {
+      car.inPitLane = false;
+    }
+
+    // Tur ve Sektör Sürelerini Hesapla (Lastik aşınması ve MOM burada işlenir)
+    const lapCalcResult = LapTimeCalculator.calculateLapTime({
+      car,
+      driver,
+      team,
+      track: this.track,
+      currentLap: lapNumber,
+      raceTimeSec: this.raceTimeSec,
+      trackWetnessPct: this.trackWetnessPct,
+      pitLossSec,
+      sessionBestSectors: this.sessionBestSectors,
+    });
+
+    // Aracın telemetri verilerini güncelle
+    car.lastLapTimeSec = lapCalcResult.lapTimeSec;
+    car.sectorTimes = lapCalcResult.sectorTimes;
+    car.sectorStatuses = lapCalcResult.sectorStatuses;
+    car.hasLockup = lapCalcResult.hasLockup;
+    lapCalcResult.newEvents.forEach((evt) => this.addEvent(evt));
+
+    // Mor ve Yeşil Sektör Kayıtlarını Güncelle
+    lapCalcResult.sectorTimes.forEach((time, idx) => {
+      // Seansın en iyisi (Mor)
+      if (this.sessionBestSectors[idx] === null || time < this.sessionBestSectors[idx]!) {
+        this.sessionBestSectors[idx] = time;
+      }
+      // Pilotun kendi en iyisi (Yeşil)
+      if (car.personalBestSectors[idx] === null || time < car.personalBestSectors[idx]!) {
+        car.personalBestSectors[idx] = time;
+      }
+    });
+
+    // Pilotun en iyi turu
+    if (car.bestLapTimeSec === null || lapCalcResult.lapTimeSec < car.bestLapTimeSec) {
+      car.bestLapTimeSec = lapCalcResult.lapTimeSec;
+    }
+
+    // Seansın En Hızlı Turu (Mor Tur: Pite girilmemiş temiz turlar arasından seçilir)
+    if (
+      pitLossSec === 0 &&
+      (!this.fastestLap || lapCalcResult.lapTimeSec < this.fastestLap.lapTimeSec)
+    ) {
+      this.fastestLap = {
+        driverId: driver.id,
+        lapTimeSec: lapCalcResult.lapTimeSec,
+        lapNumber,
+      };
+      this.addEvent({
+        lap: lapNumber,
+        timestampSec: this.raceTimeSec,
+        type: 'FASTEST_LAP',
+        driverId: driver.id,
+        message: `[EN HIZLI TUR] ${driver.shortCode} — ${this.formatTime(lapCalcResult.lapTimeSec)}`,
+        severity: 'TACTICAL',
+      });
+    }
+
+    car.currentLap = lapNumber;
+  }
+
+  /**
+   * Damalı bayrağı sallar ve yarışı resmen tamamlar.
+   */
+  private finishRace(): void {
+    this.flag = 'CHEQUERED';
+    this.cars.forEach((c) => {
+      c.isFinished = true;
+    });
+
+    const winnerCar = this.cars[0];
+    const winnerDriver = this.driversMap.get(winnerCar.driverId);
+    const winnerTeam = this.teamsMap.get(winnerCar.teamId);
+
+    this.addEvent({
+      lap: this.track.totalLaps,
+      timestampSec: this.raceTimeSec,
+      type: 'RACE_FINISH',
+      driverId: winnerCar.driverId,
+      message: `[DAMALI BAYRAK] Yarış tamamlandı! Kazanan: ${winnerDriver?.shortCode} (#${winnerCar.carNumber} ${winnerTeam?.shortName})`,
+      severity: 'TACTICAL',
+    });
   }
 
   /**
@@ -451,18 +501,31 @@ export class RaceSimulation {
 
   /**
    * Gerçek Zamanlı Mikro-Adım (Tick) Simülasyonu:
-   * 60 FPS animasyonda arabaların pist üstünde akıcı kaymasını sağlar.
+   * 60 FPS animasyonda arabaların pist üstünde akıcı kaymasını, pit yoluna sapmasını ve
+   * çizgiyi geçtiklerinde anında tur sürelerinin/lastiklerinin güncellenmesini sağlar.
    */
   public simulateTick(dtSec: number): SimulationSnapshot {
-    if (this.currentLap >= this.track.totalLaps) {
+    if (this.flag === 'CHEQUERED') {
       return this.getSnapshot();
     }
 
     this.raceTimeSec += dtSec;
 
+    // Aynı tur pite giren takım arkadaşlarını tespit et
+    const pittingDriversByTeam = new Map<string, string[]>();
+    for (const car of this.cars) {
+      if (car.pitRequestedNextLap) {
+        const list = pittingDriversByTeam.get(car.teamId) || [];
+        list.push(car.driverId);
+        pittingDriversByTeam.set(car.teamId, list);
+      }
+    }
+
+    let anyCarFinishedLap = false;
+
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
-      if (car.isDnf) continue;
+      if (car.isDnf || car.isFinished) continue;
 
       const estimatedLapTime = car.lastLapTimeSec || this.track.baseLapTimeSec;
       const speedMps = this.track.lengthMeters / estimatedLapTime;
@@ -477,21 +540,36 @@ export class RaceSimulation {
       // 2026 Aktif Aerodinamik Kontrolü: Düzlükte X-Mode, virajda Z-Mode
       car.aeroMode = AeroPowerUnitModel.evaluateAeroMode(this.track, newLapProgress);
       if (car.aeroMode === 'X_MODE') {
-        car.currentSpeedKmh += car.momActive ? 30 : 15; // X-Mode hız takviyesi
+        car.currentSpeedKmh += car.momActive
+          ? AERO_2026_CONFIG.xModeMomSpeedBoostKmh
+          : AERO_2026_CONFIG.xModeBaseSpeedBoostKmh;
+      }
+
+      // Pit yolunda mı? (Pit stop yaptıysa ve pistin ilk %12'lik dilimindeyse pit yolundadır)
+      if (car.inPitLane && newLapProgress > 0.12) {
+        car.inPitLane = false;
       }
 
       // Tur bitti mi?
       const completedLaps = Math.floor(car.totalDistanceMeters / this.track.lengthMeters);
       if (completedLaps > car.currentLap) {
-        car.currentLap = completedLaps;
+        this.processCarLapFinish(i, completedLaps, pittingDriversByTeam);
+        anyCarFinishedLap = true;
       }
     }
 
-    // Lider araca göre tur ve farkları güncelle
+    // Lider araca göre tur sayacını ve sıralama kulesini güncelle
     const leaderLaps = Math.floor((this.cars[0]?.totalDistanceMeters || 0) / this.track.lengthMeters);
     if (leaderLaps > this.currentLap) {
       this.currentLap = Math.min(this.track.totalLaps, leaderLaps);
       this.resolveOvertakes();
+      this.updateGapsAndIntervals();
+
+      // Damalı bayrak kontrolü: Lider tüm turları tamamladı mı?
+      if (this.currentLap >= this.track.totalLaps) {
+        this.finishRace();
+      }
+    } else if (anyCarFinishedLap) {
       this.updateGapsAndIntervals();
     }
 

@@ -10,6 +10,12 @@ import {
   Team,
   Track,
 } from '../types';
+import {
+  AERO_2026_CONFIG,
+  DIRTY_AIR_CONFIG,
+  PACE_CONFIG,
+  TIRE_CLIFF_CONFIG,
+} from '../config/simulationConfig';
 import { AeroPowerUnitModel } from './AeroPowerUnitModel';
 import { TireModel } from './TireModel';
 
@@ -57,19 +63,14 @@ export class LapTimeCalculator {
     const driverPaceDelta = -((driver.skill - 82) / 18) * 0.55;
     totalLapTime += driverPaceDelta;
 
-    // 3. Strateji Modu (PUSH gaza basar zaman kazandırır, CONSERVE lastik korur zaman kaybettirir)
-    let paceWearMultiplier = 1.0;
-    if (car.paceMode === 'PUSH') {
-      totalLapTime -= 0.45;        // -0.45s hız kazanır
-      paceWearMultiplier = 1.45;   // Ama lastiği %45 daha hızlı yakar
-    } else if (car.paceMode === 'CONSERVE') {
-      totalLapTime += 0.40;        // +0.40s yavaşlar
-      paceWearMultiplier = 0.75;   // Ama lastik ömrünü uzatır
-    }
+    // 3. Strateji Modu (Merkezi ayardan okunur: PUSH gaza basar, CONSERVE lastik korur)
+    const paceCfg = PACE_CONFIG[car.paceMode] || PACE_CONFIG.BALANCED;
+    totalLapTime += paceCfg.lapTimeBonusSec;
+    const paceWearMultiplier = paceCfg.wearMultiplier;
 
     // 4. Kirli Hava (Dirty Air) Kaybı: Öndeki aracın 0.8s arkasındaysak aerodinamik tutuş bozulur
     if (car.inDirtyAir && pitLossSec === 0) {
-      totalLapTime += 0.28; // Virajlarda arkadan kayma ve tutuş kaybı (+0.28s)
+      totalLapTime += DIRTY_AIR_CONFIG.lapTimePenaltySec;
     }
 
     // 5. Lastik Hamuru, Aşınma ve "Uçurum" (The Cliff) Etkisi
@@ -97,7 +98,7 @@ export class LapTimeCalculator {
     const lockupRoll = Math.random() * 100;
     if (lockupRoll < tireDelta.lockupRiskPct) {
       hasLockup = true;
-      totalLapTime += 1.35; // Virajı geniş alıp kaçış alanına taştığı için +1.35s kaybeder
+      totalLapTime += TIRE_CLIFF_CONFIG.lockupTimeLossSec;
       newEvents.push({
         lap: currentLap,
         timestampSec: raceTimeSec,
@@ -122,7 +123,7 @@ export class LapTimeCalculator {
       track,
       engineMode: car.engineMode,
       currentBatterySoC: car.batterySoCPct,
-      momRequestedOrEligible: car.intervalToAheadSec <= 1.0,
+      momRequestedOrEligible: car.intervalToAheadSec <= AERO_2026_CONFIG.momGapThresholdSec,
       intervalToAheadSec: car.intervalToAheadSec,
       teamEnginePower: team.enginePower,
       teamAeroEfficiency: team.aeroEfficiency,

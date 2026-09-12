@@ -2,6 +2,7 @@
 // 2026 kurallarıyla DRS kalktı! Artık düzlük modu ve batarya yönetimi savaşı var.
 
 import { ActiveAeroMode, EngineMode, Track } from '../types';
+import { AERO_2026_CONFIG } from '../config/simulationConfig';
 
 export interface AeroPowerResult {
   aeroMode: ActiveAeroMode;   // O anki aerodinamik mod (Z_MODE veya X_MODE)
@@ -39,12 +40,6 @@ export class AeroPowerUnitModel {
 
   /**
    * Bir tur boyunca motor gücü, X-Mode verimi ve batarya tüketimini hesaplar.
-   * 
-   * 2026 Regülasyonlarının Mantığı:
-   * 1. X-Mode: Belirlenen düzlüklerde herkes açabilir, sürtünmeyi düşürür.
-   * 2. Manual Override (MOM): Öndekine 1.0 saniye yakın olan takipçi pilot, 337 km/h'ye kadar
-   *    kesintisiz 350kW tam güç elektrik takviyesi alır.
-   * 3. Derating: Batarya %10'un altına inerse elektrik gücü erken kesilir (+0.85s kayıp).
    */
   public static calculateLapAeroPower(params: {
     track: Track;
@@ -68,7 +63,7 @@ export class AeroPowerUnitModel {
     let isDerated = false;
     let momActive = false;
 
-    // 1. Motor Gücü Avantajı (Ferrari/Red Bull gibi güçlü motorlar tur başına ~0.4s kazanır)
+    // 1. Motor Gücü Avantajı (Güçlü motorlar tur başına ~0.4s kazanır)
     const engineDelta = -((teamEnginePower - 85) / 15) * 0.4;
     lapTimeDelta += engineDelta;
 
@@ -76,42 +71,30 @@ export class AeroPowerUnitModel {
     const aeroDelta = -((teamAeroEfficiency - 85) / 15) * 0.35;
     lapTimeDelta += aeroDelta;
 
-    // 3. Seçilen Motor Modu (Pit duvarından verilen emir):
-    switch (params.engineMode) {
-      case 'ECO':
-        // Yakıt ve batarya koruma modu: Yavaştır (+0.45s) ama her tur bataryayı %18 doldurur
-        lapTimeDelta += 0.45;
-        batteryChange += 18.0;
-        break;
-      case 'STANDARD':
-        // Dengeli yarış temposu: Bataryayı yaklaşık nötr tutar (+%4 şarj)
-        lapTimeDelta += 0.0;
-        batteryChange += 4.0;
-        break;
-      case 'OVERTAKE':
-        // Tam gaz hücum modu: Tur başına -0.55s hız kazandırır ama bataryayı %22 emer!
-        lapTimeDelta -= 0.55;
-        batteryChange -= 22.0;
-        break;
-    }
+    // 3. Seçilen Motor Modu (Merkezi ayar tablosundan okunur):
+    const modeConfig = AERO_2026_CONFIG.batteryModes[params.engineMode] || AERO_2026_CONFIG.batteryModes.STANDARD;
+    lapTimeDelta += modeConfig.lapTimeDeltaSec;
+    batteryChange += modeConfig.batteryChangePct;
 
     // 4. 2026 Manual Override Mode (MOM):
-    // Öndeki araca 1.0 saniye mesafedeysek ve bataryamızda yeterli şarj (>%18) varsa MOM açılır!
-    const canUseMOM = (intervalToAheadSec <= 1.0 || momRequestedOrEligible) && currentBatterySoC > 18.0;
+    // Öndeki araca 1.0 saniye mesafedeysek ve bataryada yeterli şarj (>%18) varsa MOM açılır!
+    const canUseMOM =
+      (intervalToAheadSec <= AERO_2026_CONFIG.momGapThresholdSec || momRequestedOrEligible) &&
+      currentBatterySoC > AERO_2026_CONFIG.momMinBatterySoCPct;
 
-    if (canUseMOM && (intervalToAheadSec <= 1.0 || params.engineMode === 'OVERTAKE')) {
+    if (canUseMOM && (intervalToAheadSec <= AERO_2026_CONFIG.momGapThresholdSec || params.engineMode === 'OVERTAKE')) {
       momActive = true;
-      lapTimeDelta -= 0.45;      // 350kW ekstra roket etkisi (-0.45s hızlanma)
-      batteryChange -= 16.0;     // Düzlükte ciddi batarya harcar
+      lapTimeDelta -= AERO_2026_CONFIG.momLapTimeBonusSec;
+      batteryChange -= AERO_2026_CONFIG.momBatteryDrainPct;
     }
 
     // 5. Batarya Bitti mi? (Derating Kontrolü)
     let newSoC = Math.max(0, Math.min(100, currentBatterySoC + batteryChange));
 
-    if (newSoC <= 10.0) {
-      // Eyvah! Şarj bitti, elektrik motoru 290 km/h üstünde gücü kesti!
+    if (newSoC <= AERO_2026_CONFIG.deratingThresholdPct) {
+      // Şarj bitti, elektrik motoru gücü kesti!
       isDerated = true;
-      lapTimeDelta += 0.85;      // Düzlükte rakiplere karşı acı verici zaman kaybı
+      lapTimeDelta += AERO_2026_CONFIG.deratingTimePenaltySec;
     }
 
     return {

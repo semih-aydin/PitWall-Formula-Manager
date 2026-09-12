@@ -147,12 +147,13 @@ export interface CarState {
   // Dayanıklılık ve Olaylar
   isDnf: boolean;
   dnfReason?: string;
+  isFinished?: boolean;      // Damalı bayrağı geçip yarışı tamamladı mı?
   stressLevelPct: number;    // Pilotun stres seviyesi (yüksek stres = viraj kaçırma riski)
   hasLockup: boolean;        // Fren kilitledi mi? (Duman duman oldu mu?)
 }
 
-// Yarış Bayrakları
-export type RaceFlag = 'GREEN' | 'YELLOW' | 'VSC' | 'SAFETY_CAR' | 'RED';
+// Yarış Bayrakları (Yeşil, Sarı, VSC, Güvenlik Aracı, Kırmızı ve Damalı Bayrak)
+export type RaceFlag = 'GREEN' | 'YELLOW' | 'VSC' | 'SAFETY_CAR' | 'RED' | 'CHEQUERED';
 
 // Yarış Olayları (Telsiz ve Olay Akışı için)
 export interface RaceEvent {
@@ -170,7 +171,8 @@ export interface RaceEvent {
     | 'FASTEST_LAP'
     | 'MOM_DEPLOYED'
     | 'RADIO_MESSAGE'
-    | 'FLAG_CHANGE';
+    | 'FLAG_CHANGE'
+    | 'RACE_FINISH';
   driverId?: string;
   message: string;
   severity: 'INFO' | 'TACTICAL' | 'WARNING' | 'DANGER';

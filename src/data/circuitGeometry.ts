@@ -99,20 +99,68 @@ export const MONACO_GEOMETRY: CircuitGeometry = {
   sector2EndPct: 0.67,
 };
 
+// 3. Silverstone (Northamptonshire Airfield Circuit) 2B Koordinat Eğrisi
+// Hamilton Straight, Abbey, Farm, Village, The Loop, Aintree, Wellington Düzlüğü,
+// Brooklands, Luffield, Woodcote, Copse, Maggotts-Becketts-Chapel, Hangar Düzlüğü, Stowe, Vale, Club.
+export const SILVERSTONE_GEOMETRY: CircuitGeometry = {
+  trackId: 'track_silverstone',
+  viewBox: { width: 1000, height: 600 },
+  points: [
+    { x: 380, y: 480 }, // 0.00 Hamilton Straight (Start / Finish)
+    { x: 480, y: 480 }, // Abbey girişi
+    { x: 530, y: 450 }, // Abbey apex
+    { x: 550, y: 410 }, // Farm Curve
+    { x: 520, y: 370 }, // Village virajı
+    { x: 460, y: 360 }, // The Loop girişi
+    { x: 430, y: 390 }, // The Loop içi
+    { x: 450, y: 420 }, // The Loop çıkışı
+    { x: 500, y: 430 }, // Aintree
+    { x: 620, y: 420 }, // Wellington Düzlüğü
+    { x: 740, y: 410 }, // Wellington sonu
+    { x: 780, y: 380 }, // Brooklands
+    { x: 800, y: 330 }, // Luffield
+    { x: 760, y: 290 }, // Woodcote
+    { x: 700, y: 270 }, // Ulusal Düzlük
+    { x: 620, y: 240 }, // Copse frenajı
+    { x: 580, y: 190 }, // Copse apex
+    { x: 520, y: 170 }, // Maggotts
+    { x: 460, y: 190 }, // Becketts
+    { x: 410, y: 160 }, // Chapel çıkışı
+    { x: 260, y: 200 }, // Hangar Düzlüğü (hızlı iniş)
+    { x: 150, y: 240 }, // Stowe frenajı
+    { x: 120, y: 290 }, // Stowe apex
+    { x: 160, y: 370 }, // Vale şikanı
+    { x: 220, y: 410 }, // Club virajı girişi
+    { x: 300, y: 460 }, // Club çıkışı (Start/Finish'e bağlanış)
+    { x: 380, y: 480 }, // 1.00 Tur Sonu
+  ],
+  pitLanePoints: [
+    { x: 270, y: 460 }, // Pit girişi
+    { x: 380, y: 460 }, // Pit garajları (The Wing)
+    { x: 500, y: 460 }, // Pit çıkışı
+  ],
+  startFinishPoint: { x: 400, y: 480 },
+  sector1EndPct: 0.32,
+  sector2EndPct: 0.68,
+};
+
 export const CIRCUIT_GEOMETRIES: Record<string, CircuitGeometry> = {
   track_monza: MONZA_GEOMETRY,
   track_monaco: MONACO_GEOMETRY,
+  track_silverstone: SILVERSTONE_GEOMETRY,
 };
 
 /**
- * 0.0 ile 1.0 arasındaki bir tur ilerleme değerine karşılık gelen (x, y) koordinatını
- * pist çizgisi boyunca doğrusal interpolasyonla (lerp) hesaplar.
+ * Nokta dizisi (polyline) boyunca progressPct (0.0 - 1.0) ilerlemesine karşılık gelen
+ * (x, y) koordinatını doğrusal interpolasyonla (lerp) hesaplar.
  */
-export function getCoordinatesAtLapProgress(geometry: CircuitGeometry, progressPct: number): Point2D {
-  const points = geometry.points;
+export function getCoordinatesOnPolyline(points: Point2D[], progressPct: number): Point2D {
+  if (!points || points.length === 0) return { x: 0, y: 0 };
+  if (points.length === 1) return points[0];
+
   const clampedProgress = Math.max(0, Math.min(1.0, progressPct));
   const totalSegments = points.length - 1;
-  
+
   const rawIndex = clampedProgress * totalSegments;
   const startIndex = Math.min(Math.floor(rawIndex), totalSegments - 1);
   const endIndex = startIndex + 1;
@@ -125,4 +173,19 @@ export function getCoordinatesAtLapProgress(geometry: CircuitGeometry, progressP
     x: pStart.x + (pEnd.x - pStart.x) * segmentFraction,
     y: pStart.y + (pEnd.y - pStart.y) * segmentFraction,
   };
+}
+
+/**
+ * 0.0 ile 1.0 arasındaki bir tur ilerleme değerine karşılık gelen (x, y) koordinatını
+ * ana pist çizgisi boyunca hesaplar.
+ */
+export function getCoordinatesAtLapProgress(geometry: CircuitGeometry, progressPct: number): Point2D {
+  return getCoordinatesOnPolyline(geometry.points, progressPct);
+}
+
+/**
+ * Pitteki aracın (inPitLane) pit yolu çizgisi üzerindeki koordinatını hesaplar.
+ */
+export function getPitLaneCoordinates(geometry: CircuitGeometry, progressPct: number): Point2D {
+  return getCoordinatesOnPolyline(geometry.pitLanePoints, progressPct);
 }

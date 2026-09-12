@@ -3,7 +3,12 @@
 // En kritik strateji özelliği olan "The Rejoin Ghost" (Hayalet Çıkış) burada çizilir.
 
 import React from 'react';
-import { CIRCUIT_GEOMETRIES, getCoordinatesAtLapProgress, CircuitGeometry } from '../data/circuitGeometry';
+import {
+  CIRCUIT_GEOMETRIES,
+  getCoordinatesAtLapProgress,
+  getPitLaneCoordinates,
+  CircuitGeometry,
+} from '../data/circuitGeometry';
 import { CarState, Team, Driver } from '../types';
 
 interface CircuitRadarProps {
@@ -49,7 +54,9 @@ export const CircuitRadar: React.FC<CircuitRadarProps> = ({
   // Seçili aracın anlık koordinatı
   const selectedCar = cars.find((c) => c.driverId === selectedDriverId) || cars[0];
   const selectedCoords = selectedCar
-    ? getCoordinatesAtLapProgress(geometry, selectedCar.lapProgressPct)
+    ? (selectedCar.inPitLane
+        ? getPitLaneCoordinates(geometry, Math.min(1.0, selectedCar.lapProgressPct / 0.12))
+        : getCoordinatesAtLapProgress(geometry, selectedCar.lapProgressPct))
     : { x: 0, y: 0 };
 
   // Rejoin Ghost (Hayalet Çıkış) koordinatı
@@ -99,64 +106,62 @@ export const CircuitRadar: React.FC<CircuitRadarProps> = ({
             {/* Hayalet Araç Hologram Deseni */}
             <radialGradient id="ghost-glow" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.8" />
-              <stop offset="70%" stopColor="#0891b2" stopOpacity="0.3" />
+              <stop offset="60%" stopColor="#0891b2" stopOpacity="0.3" />
               <stop offset="100%" stopColor="#0891b2" stopOpacity="0" />
             </radialGradient>
           </defs>
 
-          {/* 1. Pist Asfalt Tabanı (Koyu geniş hat) */}
+          {/* 1. Arka Plan Vektör Izgarası (Cyberpunk / Telemetri Dokusu) */}
+          <pattern id="radar-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#171717" strokeWidth="0.5" />
+          </pattern>
+          <rect width={viewBox.width} height={viewBox.height} fill="url(#radar-grid)" />
+
+          {/* 2. Pit Yolu Çizgisi (Kesikli Turuncu/Sarı Çizgi) */}
           <path
-            d={trackPathData}
+            d={pitPathData}
             fill="none"
-            stroke="#171717"
-            strokeWidth="24"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            stroke="#f59e0b"
+            strokeWidth="3"
+            strokeDasharray="4 4"
+            opacity="0.4"
           />
 
-          {/* 2. Pist Bordürleri / Dış Çizgisi */}
+          {/* 3. Ana Pist Asfaltı (Kalın Koyu Gri Çizgi) */}
           <path
             d={trackPathData}
             fill="none"
             stroke="#262626"
-            strokeWidth="16"
+            strokeWidth="18"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
 
-          {/* 3. 2026 Aktif Aero Düzlük Bölgeleri (X-Mode açık mavi çizgiler) */}
+          {/* 4. Ana Yarış Çizgisi (Neon Camgöbeği İnce Hat) */}
           <path
             d={trackPathData}
             fill="none"
             stroke="#0e7490"
-            strokeWidth="4"
-            strokeDasharray="40 12"
+            strokeWidth="2.5"
             strokeLinecap="round"
-            opacity="0.7"
+            strokeLinejoin="round"
+            filter="url(#neon-glow)"
           />
 
-          {/* 4. Pit Yolu Çizgisi */}
-          <path
-            d={pitPathData}
-            fill="none"
-            stroke="#525252"
-            strokeWidth="4"
-            strokeDasharray="6 4"
-            strokeLinecap="round"
-          />
+          {/* 5. Start/Finish Çizgisi */}
+          {geometry.startFinishPoint && (
+            <line
+              x1={geometry.startFinishPoint.x}
+              y1={geometry.startFinishPoint.y - 12}
+              x2={geometry.startFinishPoint.x}
+              y2={geometry.startFinishPoint.y + 12}
+              stroke="#ffffff"
+              strokeWidth="2.5"
+              strokeDasharray="2 2"
+            />
+          )}
 
-          {/* 5. Start / Finish Çizgisi */}
-          <line
-            x1={geometry.startFinishPoint.x}
-            y1={geometry.startFinishPoint.y - 14}
-            x2={geometry.startFinishPoint.x}
-            y2={geometry.startFinishPoint.y + 14}
-            stroke="#ffffff"
-            strokeWidth="3"
-            strokeDasharray="3 3"
-          />
-
-          {/* 6. Rejoin Ghost ve Seçili Araç Arasındaki Taktiksel Lazer Çizgisi */}
+          {/* 6. Rejoin Ghost Projeksiyon Lazer Hattı */}
           {selectedCar && (
             <line
               x1={selectedCoords.x}
@@ -164,26 +169,25 @@ export const CircuitRadar: React.FC<CircuitRadarProps> = ({
               x2={ghostCoords.x}
               y2={ghostCoords.y}
               stroke="#06b6d4"
-              strokeWidth="1.5"
-              strokeDasharray="4 4"
-              opacity="0.4"
+              strokeWidth="1.2"
+              strokeDasharray="3 3"
+              opacity="0.6"
             />
           )}
 
-          {/* 7. THE REJOIN GHOST (Hayalet Çıkış Hologramı) */}
+          {/* 7. The Rejoin Ghost (Hayalet Çıkış Noktası) */}
           <g transform={`translate(${ghostCoords.x}, ${ghostCoords.y})`}>
-            {/* Hologram Nabız Halkası */}
             <circle
-              r="16"
+              r="14"
               fill="url(#ghost-glow)"
               className="animate-ping"
               opacity="0.75"
             />
             <circle
-              r="8"
+              r="7"
               fill="#0891b2"
               stroke="#67e8f9"
-              strokeWidth="2"
+              strokeWidth="1.5"
               opacity="0.9"
             />
             {/* Ghost Etiketi */}
@@ -201,11 +205,13 @@ export const CircuitRadar: React.FC<CircuitRadarProps> = ({
 
           {/* 8. 22 Araçlık Grid Noktaları (Neon Kapsüller) */}
           {cars.map((car) => {
-            const coords = getCoordinatesAtLapProgress(geometry, car.lapProgressPct);
+            const coords = car.inPitLane
+              ? getPitLaneCoordinates(geometry, Math.min(1.0, car.lapProgressPct / 0.12))
+              : getCoordinatesAtLapProgress(geometry, car.lapProgressPct);
             const team = getTeam(car.teamId);
             const driver = getDriver(car.driverId);
             const isSelected = car.driverId === selectedDriverId;
-            const isXMode = car.aeroMode === 'X_MODE';
+            const isXMode = car.aeroMode === 'X_MODE' && !car.inPitLane;
 
             return (
               <g
@@ -235,10 +241,20 @@ export const CircuitRadar: React.FC<CircuitRadarProps> = ({
                   />
                 )}
 
+                {/* Pit yolu ışıltısı */}
+                {car.inPitLane && (
+                  <circle
+                    r="9"
+                    fill="#f59e0b"
+                    opacity="0.3"
+                    className="animate-ping"
+                  />
+                )}
+
                 {/* Araç Kapsülü (Takım Renginde) */}
                 <circle
                   r={isSelected ? 6 : 4.5}
-                  fill={team?.colorHex || '#ffffff'}
+                  fill={car.inPitLane ? '#f59e0b' : (team?.colorHex || '#ffffff')}
                   stroke={isSelected ? '#ffffff' : '#0a0a0a'}
                   strokeWidth="1.5"
                 />
@@ -253,11 +269,15 @@ export const CircuitRadar: React.FC<CircuitRadarProps> = ({
                   fontWeight={isSelected ? 'bold' : 'normal'}
                 >
                   {driver?.shortCode}
-                  {isXMode && (
+                  {car.inPitLane ? (
+                    <tspan fill="#f59e0b" fontSize="7" dx="3" fontWeight="bold">
+                      [PIT]
+                    </tspan>
+                  ) : isXMode ? (
                     <tspan fill="#38bdf8" fontSize="7" dx="3">
                       [X]
                     </tspan>
-                  )}
+                  ) : null}
                 </text>
               </g>
             );

@@ -206,9 +206,17 @@ export const LiveTimingTower: React.FC<LiveTimingTowerProps> = ({
 
                   {/* Taktik / Box Komutu */}
                   <td className="py-1.5 px-2 text-right">
-                    {car.pitRequestedNextLap ? (
+                    {car.inPitLane ? (
+                      <span className="text-[10px] bg-amber-950 text-amber-300 border border-amber-600 px-1.5 py-0.5 rounded font-bold animate-pulse">
+                        PİTTE
+                      </span>
+                    ) : car.pitRequestedNextLap ? (
                       <span className="text-[10px] bg-red-950 text-red-300 border border-red-700 px-1.5 py-0.5 rounded font-bold animate-pulse">
-                        BOX AKTİF
+                        BOX PLANLANDI
+                      </span>
+                    ) : car.isFinished ? (
+                      <span className="text-[10px] bg-neutral-800 text-neutral-400 px-1.5 py-0.5 rounded font-bold">
+                        BİTTİ
                       </span>
                     ) : (
                       <button

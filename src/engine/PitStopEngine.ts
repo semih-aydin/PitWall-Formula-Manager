@@ -2,14 +2,15 @@
 // Pit stop anı motorsporlarının en kritik 2.5 saniyesidir: Ya yarışı kurtarırsın ya da bijon sıkışır!
 
 import { CarState, Driver, RaceEvent, Team, TireCompound, Track } from '../types';
+import { PIT_CONFIG } from '../config/simulationConfig';
 import { TireModel } from './TireModel';
 
 export interface PitStopResult {
-  lapTimeLossSec: number;       // Toplam zaman kaybı (pit yolu geçişi + tekerlek değişimi)
-  serviceTimeSec: number;       // Sadece tekerleklerin değiştiği durma süresi (örn: 2.3s)
-  wasMistake: boolean;          // Bijon sıkışması gibi bir hata oldu mu?
-  wasDoubleStack: boolean;      // Takım arkadaşının arkasında sıra bekledi mi?
-  newEvents: Omit<RaceEvent, 'id'>[];
+  lapTimeLossSec: number;        // Toplam tur süresi kaybı (Pit yolu + servis)
+  serviceTimeSec: number;        // Sadece pit kutusundaki duraklama süresi (örn: 2.4s)
+  wasMistake: boolean;           // Bijon sıkıştı mı / ekip bocaladı mı?
+  wasDoubleStack: boolean;       // Takım arkadaşı arkasında kuyrukta bekledi mi?
+  newEvents: Omit<RaceEvent, 'id'>[]; // Üretilen yarış olayları
 }
 
 export class PitStopEngine {
@@ -40,17 +41,18 @@ export class PitStopEngine {
 
     const newEvents: Omit<RaceEvent, 'id'>[] = [];
     
-    // Temel servis süresi: Red Bull gibi iyi ekipler 2.1s yaparken, zayıf ekipler 2.8s yapar
-    let serviceTime = 2.1 + (Math.max(0, 100 - team.pitCrewRating) * 0.014);
+    // Temel servis süresi: Merkezi konfigürasyondan baz alınır ve ekip tecrübesine göre şekillenir
+    let serviceTime = PIT_CONFIG.baseServiceTimeSec + (Math.max(0, 100 - team.pitCrewRating) * 0.014);
     let wasMistake = false;
     let wasDoubleStack = false;
 
     // 1. Double-Stack Krizi:
     // Eğer iki takım arkadaşı aynı tur peş peşe pite çağrıldıysa ve bu araç arkadaysa:
-    // Öndeki aracın lastikleri bitene kadar kutuda beklemek zorundadır (+3.2s ile +4.7s arası kayıp)!
+    // Öndeki aracın lastikleri bitene kadar kutuda beklemek zorundadır!
     if (teammateAlsoPitting && !isTeammateBehind) {
       wasDoubleStack = true;
-      const queueDelay = 3.2 + (Math.random() * 1.5);
+      const queueRange = PIT_CONFIG.maxDoubleStackDelaySec - PIT_CONFIG.minDoubleStackDelaySec;
+      const queueDelay = PIT_CONFIG.minDoubleStackDelaySec + (Math.random() * queueRange);
       serviceTime += queueDelay;
       car.doubleStackDelayed = true;
 
@@ -66,12 +68,13 @@ export class PitStopEngine {
       car.doubleStackDelayed = false;
     }
 
-    // 2. Ekip Hatası & Bijon Sıkışması (Bottas Monako 2021 faciası gibi):
-    // Ekip tecrübesi düştükçe sağ arka bijonun sıkışma ihtimali artar.
-    const mistakeChance = Math.max(2.0, (100 - team.pitCrewRating) * 0.12);
+    // 2. Ekip Hatası & Bijon Sıkışması:
+    // Ekip tecrübesi düştükçe bijonun sıkışma ihtimali artar.
+    const mistakeChance = Math.max(2.0, (100 - team.pitCrewRating) * PIT_CONFIG.baseMistakeFactor);
     if (Math.random() * 100 < mistakeChance) {
       wasMistake = true;
-      const extraDelay = 3.8 + (Math.random() * 3.5); // 4-7 saniye ekstra eziyet
+      const delayRange = PIT_CONFIG.maxMistakeDelaySec - PIT_CONFIG.minMistakeDelaySec;
+      const extraDelay = PIT_CONFIG.minMistakeDelaySec + (Math.random() * delayRange);
       serviceTime += extraDelay;
 
       newEvents.push({

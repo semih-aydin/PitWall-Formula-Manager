@@ -50,6 +50,10 @@ export default function App() {
 
       const newSnap = sim.simulateTick(effectiveDt);
       setSnapshot({ ...newSnap });
+
+      if (newSnap.flag === 'CHEQUERED') {
+        setIsPlaying(false);
+      }
     }, 40); // ~25 FPS akıcı telemetri güncellemesi
 
     return () => clearInterval(interval);
@@ -59,6 +63,9 @@ export default function App() {
   const handleNextLap = () => {
     const snap = sim.simulateLap();
     setSnapshot({ ...snap });
+    if (snap.flag === 'CHEQUERED') {
+      setIsPlaying(false);
+    }
   };
 
   // Pite Çağır (Box)
@@ -181,9 +188,21 @@ export default function App() {
           )}
 
           {/* Bayrak Durumu */}
-          <div className="bg-neutral-950 border border-neutral-800 px-2.5 py-1.5 rounded flex items-center gap-1.5">
-            <Flag className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="text-xs font-bold text-emerald-400">{snapshot.flag}</span>
+          <div
+            className={`px-2.5 py-1.5 rounded flex items-center gap-1.5 border transition-all ${
+              snapshot.flag === 'CHEQUERED'
+                ? 'bg-neutral-100 text-neutral-950 border-neutral-300 font-black animate-pulse'
+                : snapshot.flag === 'YELLOW'
+                ? 'bg-yellow-950 border-yellow-800 text-yellow-400'
+                : snapshot.flag === 'RED'
+                ? 'bg-red-950 border-red-800 text-red-400'
+                : 'bg-neutral-950 border-neutral-800 text-emerald-400'
+            }`}
+          >
+            <Flag className={`w-3.5 h-3.5 ${snapshot.flag === 'CHEQUERED' ? 'text-neutral-950' : 'text-emerald-400'}`} />
+            <span className="text-xs font-bold font-mono">
+              {snapshot.flag === 'CHEQUERED' ? 'DAMALI BAYRAK' : snapshot.flag}
+            </span>
           </div>
         </div>
 

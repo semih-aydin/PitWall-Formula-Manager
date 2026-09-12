@@ -210,23 +210,47 @@ export const DriverTelemetryCard: React.FC<DriverTelemetryCardProps> = ({
 
         {/* Pit Çağrısı (BOX THIS LAP) */}
         <div className="pt-1">
-          <span className="text-[10px] text-neutral-400 block mb-1">PİT STOP ÇAĞRISI:</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-neutral-400">PİT STOP ÇAĞRISI:</span>
+            {car.pitRequestedNextLap && (
+              <span className="text-[10px] text-red-400 font-bold animate-pulse">
+                TUR SONU PİT ONAYLANDI ({car.selectedNextCompound})
+              </span>
+            )}
+            {car.inPitLane && (
+              <span className="text-[10px] text-amber-400 font-bold animate-pulse">
+                ŞU AN PİT YOLUNDA
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-3 gap-1.5 text-[11px]">
             <button
               onClick={() => onOrderBox('SOFT')}
-              className="py-1.5 rounded font-bold border border-red-700 bg-red-950/60 hover:bg-red-900 text-red-300 transition cursor-pointer"
+              className={`py-1.5 rounded font-bold border transition cursor-pointer ${
+                car.pitRequestedNextLap && car.selectedNextCompound === 'SOFT'
+                  ? 'border-red-500 bg-red-800 text-white animate-pulse'
+                  : 'border-red-700 bg-red-950/60 hover:bg-red-900 text-red-300'
+              }`}
             >
               BOX (SOFT)
             </button>
             <button
               onClick={() => onOrderBox('MEDIUM')}
-              className="py-1.5 rounded font-bold border border-yellow-700 bg-yellow-950/60 hover:bg-yellow-900 text-yellow-300 transition cursor-pointer"
+              className={`py-1.5 rounded font-bold border transition cursor-pointer ${
+                car.pitRequestedNextLap && car.selectedNextCompound === 'MEDIUM'
+                  ? 'border-yellow-500 bg-yellow-800 text-white animate-pulse'
+                  : 'border-yellow-700 bg-yellow-950/60 hover:bg-yellow-900 text-yellow-300'
+              }`}
             >
               BOX (MED)
             </button>
             <button
               onClick={() => onOrderBox('HARD')}
-              className="py-1.5 rounded font-bold border border-neutral-600 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition cursor-pointer"
+              className={`py-1.5 rounded font-bold border transition cursor-pointer ${
+                car.pitRequestedNextLap && car.selectedNextCompound === 'HARD'
+                  ? 'border-neutral-300 bg-neutral-600 text-white animate-pulse'
+                  : 'border-neutral-600 bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
+              }`}
             >
               BOX (HARD)
             </button>
