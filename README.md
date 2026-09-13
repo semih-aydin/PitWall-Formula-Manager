@@ -1,4 +1,4 @@
-﻿# PitWall: Formula Manager
+# PitWall: Formula Manager
 
 > **"Sen araba sürmüyorsun. Sen pit duvarında, önünde 15 ekran yanıp sönen, kulağında telsiz cızırtısı olan Baş Stratejistsin."**
 
@@ -41,6 +41,9 @@
 
 - [**04. Gerçekçi Geliştirme Yol Haritası ve Etaplar**](./docs/04-ROADMAP-AND-MILESTONES.md)
   *Acele etmeden, sakin ve modüler parçalara bölünmüş 5 aşamalı geliştirme takvimi.*
+
+- [**05. Ekip İş Bölümü ve Sorumluluk Dağılımı: Semih & Efe**](./docs/05-TEAM-DIVISION-OF-LABOR.md)
+  *Semih (Sistem & Motor Mimarisi) ve Efe (Taktik Arayüz & Görsel Deneyim) arasındaki modüler görev paylaşımı.*
 
 ---
 
