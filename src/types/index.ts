@@ -171,11 +171,32 @@ export interface RaceEvent {
     | 'FASTEST_LAP'
     | 'MOM_DEPLOYED'
     | 'RADIO_MESSAGE'
+    | 'WEATHER_CHANGE'
     | 'FLAG_CHANGE'
     | 'RACE_FINISH';
   driverId?: string;
   message: string;
   severity: 'INFO' | 'TACTICAL' | 'WARNING' | 'DANGER';
+}
+
+// 8. Dinamik Hava Durumu ve Islaklık Modelleri (Faz 4 - Semih)
+export type WeatherCondition = 'DRY' | 'OVERCAST' | 'DRIZZLE' | 'RAIN' | 'HEAVY_RAIN';
+
+export interface WeatherForecast {
+  inLaps: number;
+  condition: WeatherCondition;
+  rainProbabilityPct: number;
+  projectedWetnessPct: number;
+}
+
+export interface WeatherState {
+  condition: WeatherCondition;
+  trackWetnessPct: number;   // Pist Islaklık Seviyesi (%0.0 - %100.0)
+  rainIntensityPct: number;  // Anlık yağış şiddeti (%0.0 - %100.0)
+  airTempCelsius: number;    // Hava sıcaklığı (°C)
+  trackTempCelsius: number;  // Asfalt sıcaklığı (°C)
+  optimalCompound: TireCompound; // Islaklığa göre ideal hamur (SOFT/MED/HARD, INTERMEDIATE, WET)
+  forecast: WeatherForecast[];   // Gelecek turların radar tahmini
 }
 
 // Telemetri Anlık Ekranı (React arayüzüne gönderilen paket)
@@ -185,6 +206,11 @@ export interface SimulationSnapshot {
   raceTimeSec: number;
   flag: RaceFlag;
   trackWetnessPct: number;   // Pist Islaklık Seviyesi (%0 Kuru, %100 Sağanak)
+  weatherCondition: WeatherCondition;
+  airTempCelsius: number;
+  trackTempCelsius: number;
+  optimalCompound: TireCompound;
+  weatherForecast: WeatherForecast[];
   leaderDriverId: string;
   fastestLap: {
     driverId: string;
@@ -195,3 +221,4 @@ export interface SimulationSnapshot {
   leaderboard: CarState[];    // P1'den P22'ye sıralanmış ızgara
   recentEvents: RaceEvent[];  // Son telsiz ve yarış olayları
 }
+

@@ -11,12 +11,14 @@ import {
   Team,
   TireCompound,
   Track,
+  WeatherCondition,
 } from '../types';
 import { AeroPowerUnitModel } from './AeroPowerUnitModel';
 import { LapTimeCalculator } from './LapTimeCalculator';
 import { OvertakeEngine } from './OvertakeEngine';
 import { PitStopEngine } from './PitStopEngine';
 import { TireModel } from './TireModel';
+import { WeatherEngine } from './WeatherEngine';
 import { AERO_2026_CONFIG, DIRTY_AIR_CONFIG } from '../config/simulationConfig';
 
 export interface RaceSimulationConfig {
@@ -24,6 +26,8 @@ export interface RaceSimulationConfig {
   teams: Team[];
   drivers: Driver[];
   initialTireCompound?: TireCompound;
+  initialWeather?: WeatherCondition;
+  initialWetnessPct?: number;
 }
 
 export class RaceSimulation {
@@ -34,6 +38,7 @@ export class RaceSimulation {
   private cars: CarState[] = [];
   private currentLap = 0;
   private raceTimeSec = 0.0;
+  private weatherEngine: WeatherEngine;
   private trackWetnessPct = 0.0;
   private flag: RaceFlag = 'GREEN';
   private events: RaceEvent[] = [];
@@ -51,6 +56,12 @@ export class RaceSimulation {
     this.track = config.track;
     this.teamsMap = new Map(config.teams.map((t) => [t.id, t]));
     this.driversMap = new Map(config.drivers.map((d) => [d.id, d]));
+
+    this.weatherEngine = new WeatherEngine(
+      config.initialWeather || 'DRY',
+      config.initialWetnessPct || 0.0
+    );
+    this.trackWetnessPct = this.weatherEngine.getTrackWetnessPct();
 
     this.initializeGrid(config.initialTireCompound || 'MEDIUM');
   }
@@ -138,7 +149,12 @@ export class RaceSimulation {
       }
     }
 
-    // 1. Her bir araç için tur tamamlama boru hattını çalıştır
+    // 1. Dinamik Hava Durumu ve Islaklığı 1 Tur İlerlet
+    const weatherEvents = this.weatherEngine.tickLap(nextLap, this.track.totalLaps, this.raceTimeSec);
+    this.trackWetnessPct = this.weatherEngine.getTrackWetnessPct();
+    weatherEvents.forEach((evt) => this.addEvent(evt));
+
+    // 2. Her bir araç için tur tamamlama boru hattını çalıştır
     for (let i = 0; i < this.cars.length; i++) {
       const car = this.cars[i];
       if (car.isDnf) continue;
@@ -148,6 +164,7 @@ export class RaceSimulation {
       car.lapProgressPct = 0.0;
       car.inPitLane = false;
     }
+
 
     this.currentLap = nextLap;
 
@@ -407,12 +424,18 @@ export class RaceSimulation {
 
   // React arayüzüne anlık yarış durumunu döndürür
   public getSnapshot(): SimulationSnapshot {
+    const weatherState = this.weatherEngine.getState();
     return {
       currentLap: this.currentLap,
       totalLaps: this.track.totalLaps,
       raceTimeSec: Math.round(this.raceTimeSec * 10) / 10,
       flag: this.flag,
       trackWetnessPct: this.trackWetnessPct,
+      weatherCondition: weatherState.condition,
+      airTempCelsius: weatherState.airTempCelsius,
+      trackTempCelsius: weatherState.trackTempCelsius,
+      optimalCompound: weatherState.optimalCompound,
+      weatherForecast: weatherState.forecast,
       leaderDriverId: this.cars[0]?.driverId || '',
       fastestLap: this.fastestLap,
       sessionBestSectors: [...this.sessionBestSectors],
@@ -420,6 +443,16 @@ export class RaceSimulation {
       recentEvents: [...this.events],
     };
   }
+
+  public getWeatherEngine(): WeatherEngine {
+    return this.weatherEngine;
+  }
+
+  public setWeatherCondition(condition: WeatherCondition, wetnessPct?: number): void {
+    this.weatherEngine.setCondition(condition, wetnessPct);
+    this.trackWetnessPct = this.weatherEngine.getTrackWetnessPct();
+  }
+
 
   public getDriver(driverId: string): Driver | undefined {
     return this.driversMap.get(driverId);
@@ -511,6 +544,11 @@ export class RaceSimulation {
 
     this.raceTimeSec += dtSec;
 
+    // Hava durumu mikro-ilerlemesi (yağmur ve buharlaşmayı saniyeler içinde akıcı işletir)
+    const baseTime = this.track.baseLapTimeSec || 80.0;
+    this.weatherEngine.tickTime(dtSec, baseTime);
+    this.trackWetnessPct = this.weatherEngine.getTrackWetnessPct();
+
     // Aynı tur pite giren takım arkadaşlarını tespit et
     const pittingDriversByTeam = new Map<string, string[]>();
     for (const car of this.cars) {
@@ -562,6 +600,12 @@ export class RaceSimulation {
     const leaderLaps = Math.floor((this.cars[0]?.totalDistanceMeters || 0) / this.track.lengthMeters);
     if (leaderLaps > this.currentLap) {
       this.currentLap = Math.min(this.track.totalLaps, leaderLaps);
+
+      // Her yeni turda hava durumu geçiş ve telsiz kontrolünü tetikle
+      const weatherEvents = this.weatherEngine.tickLap(this.currentLap, this.track.totalLaps, this.raceTimeSec);
+      this.trackWetnessPct = this.weatherEngine.getTrackWetnessPct();
+      weatherEvents.forEach((evt) => this.addEvent(evt));
+
       this.resolveOvertakes();
       this.updateGapsAndIntervals();
 

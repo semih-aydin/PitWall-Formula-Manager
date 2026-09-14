@@ -23,6 +23,8 @@ interface DriverTelemetryCardProps {
     aheadDriverCode?: string;
     gapToAheadSec: number;
   };
+  trackWetnessPct?: number;
+  optimalCompound?: TireCompound;
   onPaceChange: (mode: PaceMode) => void;
   onEngineChange: (mode: EngineMode) => void;
   onOrderBox: (compound: TireCompound) => void;
@@ -38,10 +40,13 @@ export const DriverTelemetryCard: React.FC<DriverTelemetryCardProps> = ({
   behindCar,
   behindDriver,
   rejoinProjection,
+  trackWetnessPct,
+  optimalCompound,
   onPaceChange,
   onEngineChange,
   onOrderBox,
 }) => {
+
   if (!driver || !team) return null;
 
   // Undercut / Overcut Taktik Penceresi Analizi (Öğrenci işi: Temiz matematik ve kural mantığı)
@@ -227,6 +232,11 @@ export const DriverTelemetryCard: React.FC<DriverTelemetryCardProps> = ({
 
         <div className="flex items-center justify-between text-[10px] font-mono pt-1 text-neutral-400">
           <span>SICAKLIK: <strong className="text-neutral-200">{car.tires.tempCelsius.toFixed(0)}°C</strong></span>
+          {trackWetnessPct !== undefined && trackWetnessPct > 15 && (
+            <span className="text-cyan-400 font-semibold">
+              ISLAKLIK: %{trackWetnessPct.toFixed(0)}
+            </span>
+          )}
           {car.inDirtyAir && (
             <span className="text-orange-400 flex items-center gap-0.5 font-bold">
               <Wind className="w-3 h-3" /> KİRLİ HAVA (AŞIRI ISINMA)
@@ -238,6 +248,7 @@ export const DriverTelemetryCard: React.FC<DriverTelemetryCardProps> = ({
             </span>
           )}
         </div>
+
       </div>
 
       {/* Taktik Karar Penceresi (Undercut / Overcut Danışmanı) */}
@@ -357,38 +368,69 @@ export const DriverTelemetryCard: React.FC<DriverTelemetryCardProps> = ({
               </span>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-1.5 text-[11px]">
+          <div className="grid grid-cols-5 gap-1 text-[10px]">
             <button
               onClick={() => handleBoxClick('SOFT')}
               className={`py-1.5 rounded font-bold border transition cursor-pointer ${
                 car.pitRequestedNextLap && car.selectedNextCompound === 'SOFT'
                   ? 'border-red-500 bg-red-800 text-white animate-pulse'
-                  : 'border-red-700 bg-red-950/60 hover:bg-red-900 text-red-300'
+                  : optimalCompound === 'SOFT'
+                  ? 'border-red-500 bg-red-950/80 text-red-200 ring-1 ring-red-400'
+                  : 'border-red-800/80 bg-red-950/50 hover:bg-red-900 text-red-300'
               }`}
             >
-              BOX (SOFT)
+              BOX (S)
             </button>
             <button
               onClick={() => handleBoxClick('MEDIUM')}
               className={`py-1.5 rounded font-bold border transition cursor-pointer ${
                 car.pitRequestedNextLap && car.selectedNextCompound === 'MEDIUM'
                   ? 'border-yellow-500 bg-yellow-800 text-white animate-pulse'
-                  : 'border-yellow-700 bg-yellow-950/60 hover:bg-yellow-900 text-yellow-300'
+                  : optimalCompound === 'MEDIUM'
+                  ? 'border-yellow-500 bg-yellow-950/80 text-yellow-200 ring-1 ring-yellow-400'
+                  : 'border-yellow-800/80 bg-yellow-950/50 hover:bg-yellow-900 text-yellow-300'
               }`}
             >
-              BOX (MED)
+              BOX (M)
             </button>
             <button
               onClick={() => handleBoxClick('HARD')}
               className={`py-1.5 rounded font-bold border transition cursor-pointer ${
                 car.pitRequestedNextLap && car.selectedNextCompound === 'HARD'
                   ? 'border-neutral-300 bg-neutral-600 text-white animate-pulse'
-                  : 'border-neutral-600 bg-neutral-800 hover:bg-neutral-700 text-neutral-200'
+                  : optimalCompound === 'HARD'
+                  ? 'border-neutral-300 bg-neutral-700/80 text-white ring-1 ring-neutral-300'
+                  : 'border-neutral-700 bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300'
               }`}
             >
-              BOX (HARD)
+              BOX (H)
+            </button>
+            <button
+              onClick={() => handleBoxClick('INTERMEDIATE')}
+              className={`py-1.5 rounded font-bold border transition cursor-pointer ${
+                car.pitRequestedNextLap && car.selectedNextCompound === 'INTERMEDIATE'
+                  ? 'border-emerald-400 bg-emerald-700 text-white animate-pulse'
+                  : optimalCompound === 'INTERMEDIATE'
+                  ? 'border-emerald-400 bg-emerald-950/90 text-emerald-200 ring-1 ring-emerald-400 animate-pulse'
+                  : 'border-emerald-800/80 bg-emerald-950/50 hover:bg-emerald-900 text-emerald-300'
+              }`}
+            >
+              BOX (INT)
+            </button>
+            <button
+              onClick={() => handleBoxClick('WET')}
+              className={`py-1.5 rounded font-bold border transition cursor-pointer ${
+                car.pitRequestedNextLap && car.selectedNextCompound === 'WET'
+                  ? 'border-blue-400 bg-blue-700 text-white animate-pulse'
+                  : optimalCompound === 'WET'
+                  ? 'border-blue-400 bg-blue-950/90 text-blue-200 ring-1 ring-blue-400 animate-pulse'
+                  : 'border-blue-800/80 bg-blue-950/50 hover:bg-blue-900 text-blue-300'
+              }`}
+            >
+              BOX (WET)
             </button>
           </div>
+
         </div>
       </div>
     </div>

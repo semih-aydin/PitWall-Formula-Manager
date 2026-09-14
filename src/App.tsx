@@ -13,7 +13,8 @@ import { EventFeed } from './components/EventFeed';
 import { SpeedControls } from './components/SpeedControls';
 import { AudioControls } from './components/AudioControls';
 import { SimulationSnapshot, TireCompound, PaceMode, EngineMode } from './types';
-import { Activity, Flag } from 'lucide-react';
+import { Activity, Flag, CloudRain, Sun, Cloud } from 'lucide-react';
+
 
 export default function App() {
   const [selectedTrackIndex, setSelectedTrackIndex] = useState(0);
@@ -195,7 +196,44 @@ export default function App() {
             </div>
           )}
 
+          {/* Canlı Hava Durumu & Pist Islaklığı */}
+          <div className="bg-neutral-950 border border-neutral-800 px-3 py-1.5 rounded flex items-center gap-2">
+            <div className="flex flex-col">
+              <span className="text-neutral-500 block text-[9px]">HAVA & PİST</span>
+              <div className="flex items-center gap-1.5">
+                {snapshot.trackWetnessPct > 60 ? (
+                  <CloudRain className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+                ) : snapshot.trackWetnessPct > 18 ? (
+                  <CloudRain className="w-3.5 h-3.5 text-emerald-400" />
+                ) : snapshot.weatherCondition === 'OVERCAST' ? (
+                  <Cloud className="w-3.5 h-3.5 text-neutral-400" />
+                ) : (
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                )}
+                <span className="text-xs font-bold text-neutral-200 font-mono">
+                  %{snapshot.trackWetnessPct.toFixed(0)} ISLAK
+                </span>
+                <span
+                  className={`text-[9px] px-1 py-0.5 rounded font-bold uppercase ${
+                    snapshot.optimalCompound === 'WET'
+                      ? 'bg-blue-950 text-blue-300 border border-blue-800'
+                      : snapshot.optimalCompound === 'INTERMEDIATE'
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      : 'bg-neutral-800 text-neutral-300 border border-neutral-700'
+                  }`}
+                >
+                  {snapshot.optimalCompound === 'WET'
+                    ? 'WET'
+                    : snapshot.optimalCompound === 'INTERMEDIATE'
+                    ? 'INTER'
+                    : 'SLICK'}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Bayrak Durumu */}
+
           <div
             className={`px-2.5 py-1.5 rounded flex items-center gap-1.5 border transition-all ${
               snapshot.flag === 'CHEQUERED'
@@ -272,10 +310,13 @@ export default function App() {
                 behindCar={behindCar}
                 behindDriver={behindDriver}
                 rejoinProjection={rejoinProjection}
+                trackWetnessPct={snapshot.trackWetnessPct}
+                optimalCompound={snapshot.optimalCompound}
                 onPaceChange={handlePaceChange}
                 onEngineChange={handleEngineChange}
                 onOrderBox={(compound) => handleOrderBox(selectedDriverId, compound)}
               />
+
             )}
 
             {/* Telsiz ve Olay Akışı */}

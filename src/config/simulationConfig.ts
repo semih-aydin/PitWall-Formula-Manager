@@ -124,3 +124,31 @@ export const OVERTAKE_CONFIG = {
   // Başarılı bir geçiş için gereken minimum atak skoru üstünlüğü
   minAttackMargin: 3.0,
 };
+
+// 7. DİNAMİK HAVA DURUMU VE GEÇİŞ LASTİĞİ (CROSSOVER) AYARLARI (Faz 4 - Semih)
+// Yağmur ne zaman Inter/Wet gerektirir, pist kaç turda kurur gibi tüm fizik parametreleri.
+export const WEATHER_CONFIG = {
+  // Crossover Eşikleri: Lastik stratejisinin kader anları (%)
+  // %18'in altı: Kuru zemin slick hamurlar (Soft/Med/Hard)
+  // %18 - %62 arası: Yeşil yanaklı Geçiş Lastiği (Intermediate)
+  // %62'nin üstü: Mavi yanaklı Yoğun Yağmur Lastiği (Full Wet)
+  intermediateCrossoverPct: 18.0,
+  wetCrossoverPct: 62.0,
+
+  // Tur Başına Yağış Birikim Oranları (%)
+  drizzleAccumulationPerLap: 4.5,
+  rainAccumulationPerLap: 9.5,
+  heavyRainAccumulationPerLap: 16.0,
+
+  // Yağmur durduğunda veya azaldığında pistin doğal kuruma hızı (%/tur)
+  // Asfalt sıcaklığı yüksekse bu hız daha da artar
+  baseDryingRatePerLap: 2.4,
+
+  // Sıcaklık baz değerleri (°C)
+  baseAirTempCelsius: 23.0,
+  baseTrackTempCelsius: 32.0,
+
+  // Hava durumu geçiş olasılığı (her tur havanın evrilme şansı: %12)
+  weatherTransitionChance: 0.12,
+};
+
